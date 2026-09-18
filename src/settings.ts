@@ -4,7 +4,7 @@
 // device's plugin data and is sent only to the selected provider — never
 // to Habitude servers.
 
-import { App, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, TextComponent, type Setting } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
 import { t } from './i18n';
 import type HabitudePlugin from './main';
@@ -26,17 +26,14 @@ export class HabitudeSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Declarative settings for Obsidian 1.13.0+: makes the settings appear in
-	 * the native settings search. On 1.13+, display() is bypassed and only
-	 * this runs; display() below remains as the fallback for older versions
-	 * (minAppVersion is still 1.7.2).
+	 * Declarative settings (Obsidian 1.13.0+, the plugin's minAppVersion):
+	 * makes the settings appear in the native settings search.
 	 *
 	 * NOTE: the declarative SettingControl union has NO password/secret
 	 * variant, so a plain `control: { type: 'text' }` would render the API key
-	 * in clear text on 1.13+. The key therefore uses the `render` escape hatch
-	 * (the community-standard pattern) and hand-renders a password input —
-	 * exactly like the display() fallback. The definition still carries
-	 * name/desc so settings search keeps working.
+	 * in clear text. The key therefore uses the `render` escape hatch
+	 * (the community-standard pattern) and hand-renders a password input.
+	 * The definition still carries name/desc so settings search keeps working.
 	 */
 	getSettingDefinitions(): SettingDefinitionItem[] {
 		const def = getProvider(this.plugin.settings.llmProvider);
@@ -147,6 +144,16 @@ export class HabitudeSettingTab extends PluginSettingTab {
 				},
 			},
 			{
+				name: t('settings.cloudUseMock.name'),
+				desc: t('settings.cloudUseMock.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'toggle',
+					key: 'cloudUseMock',
+					defaultValue: DEFAULT_SETTINGS.cloudUseMock,
+				},
+			},
+			{
 				name: t('settings.cloudStatus.name'),
 				desc: this.cloudStatusText(),
 			},
@@ -163,7 +170,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			{
 				name: t('settings.cloudApiKey.name'),
 				desc: t('settings.cloudApiKey.desc'),
-				visible: () => this.plugin.settings.cloudEnabled,
+				visible: () => this.plugin.settings.cloudEnabled && !this.plugin.settings.cloudUseMock,
 				render: (setting) => {
 					setting.addText((text) => this.configureCloudKeyInput(text));
 				},
@@ -171,7 +178,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			{
 				name: t('settings.cloudAuthDomain.name'),
 				desc: t('settings.cloudAuthDomain.desc'),
-				visible: () => this.plugin.settings.cloudEnabled,
+				visible: () => this.plugin.settings.cloudEnabled && !this.plugin.settings.cloudUseMock,
 				control: {
 					type: 'text',
 					key: 'cloudAuthDomain',
@@ -182,7 +189,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			{
 				name: t('settings.cloudProjectId.name'),
 				desc: t('settings.cloudProjectId.desc'),
-				visible: () => this.plugin.settings.cloudEnabled,
+				visible: () => this.plugin.settings.cloudEnabled && !this.plugin.settings.cloudUseMock,
 				control: {
 					type: 'text',
 					key: 'cloudProjectId',
@@ -192,7 +199,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			{
 				name: t('settings.cloudAppId.name'),
 				desc: t('settings.cloudAppId.desc'),
-				visible: () => this.plugin.settings.cloudEnabled,
+				visible: () => this.plugin.settings.cloudEnabled && !this.plugin.settings.cloudUseMock,
 				control: {
 					type: 'text',
 					key: 'cloudAppId',
@@ -202,7 +209,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			{
 				name: t('settings.cloudStorageBucket.name'),
 				desc: t('settings.cloudStorageBucket.desc'),
-				visible: () => this.plugin.settings.cloudEnabled,
+				visible: () => this.plugin.settings.cloudEnabled && !this.plugin.settings.cloudUseMock,
 				control: {
 					type: 'text',
 					key: 'cloudStorageBucket',
@@ -212,7 +219,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			{
 				name: t('settings.cloudMessagingSenderId.name'),
 				desc: t('settings.cloudMessagingSenderId.desc'),
-				visible: () => this.plugin.settings.cloudEnabled,
+				visible: () => this.plugin.settings.cloudEnabled && !this.plugin.settings.cloudUseMock,
 				control: {
 					type: 'text',
 					key: 'cloudMessagingSenderId',
@@ -284,6 +291,8 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			this.plugin.settings.coachLanguage = value === 'ko' ? 'ko' : value === 'en' ? 'en' : 'auto';
 		} else if (key === 'cloudEnabled') {
 			this.plugin.settings.cloudEnabled = value === true;
+		} else if (key === 'cloudUseMock') {
+			this.plugin.settings.cloudUseMock = value === true;
 		} else if (
 			key === 'cloudAuthDomain' ||
 			key === 'cloudProjectId' ||
@@ -300,10 +309,8 @@ export class HabitudeSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Shared wiring for the LLM API-key input. Used by BOTH the declarative
-	 * `render` escape hatch (Obsidian 1.13+) and the display() fallback
-	 * (older versions), so the key is always a masked password input and the
-	 * two paths cannot drift apart.
+	 * Shared wiring for the LLM API-key input, used by the declarative
+	 * `render` escape hatch: the key is always a masked password input.
 	 *
 	 * The input never pre-fills the saved key into the DOM: when a key is
 	 * stored the placeholder shows a mask hint instead.
@@ -326,8 +333,8 @@ export class HabitudeSettingTab extends PluginSettingTab {
 
 	/**
 	 * Masked input for the Firebase API key. The input never pre-fills the
-	 * saved key into the DOM: a mask hint shows instead. Shared by the
-	 * declarative `render` escape hatch and the display() fallback.
+	 * saved key into the DOM: a mask hint shows instead. Used by the
+	 * declarative `render` escape hatch.
 	 */
 	private configureCloudKeyInput(text: TextComponent): TextComponent {
 		text.inputEl.type = 'password';
@@ -486,248 +493,5 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			new Notice(t('cmd.syncFailed', { detail: e instanceof Error ? e.message : String(e) }));
 		}
 	}
-
-	/** Fallback for Obsidian < 1.13.0 (bypassed when getSettingDefinitions runs). */
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-		const def = getProvider(this.plugin.settings.llmProvider);
-
-		new Setting(containerEl)
-			.setName(t('settings.dataFolder.name'))
-			.setDesc(t('settings.dataFolder.desc'))
-			.addText((text) =>
-				text
-					.setPlaceholder(t('settings.dataFolder.placeholder'))
-					.setValue(this.plugin.settings.dataFolder)
-					.onChange(async (value) => {
-						this.plugin.settings.dataFolder = value.trim() || 'Habitude';
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t('settings.weekStart.name'))
-			.setDesc(t('settings.weekStart.desc'))
-			.addDropdown((drop) =>
-				drop
-					.addOption('1', t('settings.weekStart.monday'))
-					.addOption('0', t('settings.weekStart.sunday'))
-					.setValue(String(this.plugin.settings.weekStart))
-					.onChange(async (value) => {
-						this.plugin.settings.weekStart = value === '0' ? 0 : 1;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t('settings.checkmarkColor.name'))
-			.setDesc(t('settings.checkmarkColor.desc'))
-			.addColorPicker((cp) =>
-				cp
-					.setValue(normalizeCheckmarkColor(this.plugin.settings.checkmarkColor))
-					.onChange(async (value) => {
-						this.plugin.settings.checkmarkColor = normalizeCheckmarkColor(value);
-						// saveSettings() re-renders open views → color updates live.
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t('settings.provider.name'))
-			.setDesc(t('settings.provider.desc'))
-			.addDropdown((drop) => {
-				for (const id of LLM_PROVIDER_IDS) {
-					drop.addOption(id, t(`settings.provider.${id}`));
-				}
-				return drop.setValue(this.plugin.settings.llmProvider).onChange(async (value) => {
-					const id = (LLM_PROVIDER_IDS as string[]).includes(value) ? (value as LlmProviderId) : 'gemini';
-					this.plugin.settings.llmProvider = id;
-					await this.plugin.saveSettings();
-					// Re-render so the model placeholder / key hint follow the provider.
-					this.display();
-				});
-			});
-
-		new Setting(containerEl)
-			.setName(t('settings.llmKey.name'))
-			.setDesc(def.needsKey ? t('settings.llmKey.desc') : t('settings.llmKey.noKeyDesc'))
-			.addText((text) => {
-				this.configureLlmKeyInput(text);
-			});
-
-		new Setting(containerEl)
-			.setName(t('settings.llmModel.name'))
-			.setDesc(t('settings.llmModel.desc'))
-			.addText((text) =>
-				text
-					.setPlaceholder(def.modelPlaceholder)
-					.setValue(this.plugin.settings.llmModel)
-					.onChange(async (value) => {
-						this.plugin.settings.llmModel = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t('settings.baseUrl.name'))
-			.setDesc(def.id === 'custom' ? t('settings.baseUrl.requiredDesc') : t('settings.baseUrl.desc'))
-			.addText((text) =>
-				text
-					.setPlaceholder(t('settings.baseUrl.placeholder', { url: def.defaultBaseUrl || '—' }))
-					.setValue(this.plugin.settings.llmBaseUrl)
-					.onChange(async (value) => {
-						this.plugin.settings.llmBaseUrl = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t('settings.coachLanguage.name'))
-			.setDesc(t('settings.coachLanguage.desc'))
-			.addDropdown((drop) =>
-				drop
-					.addOption('auto', t('settings.coachLanguage.auto'))
-					.addOption('en', t('settings.coachLanguage.english'))
-					.addOption('ko', t('settings.coachLanguage.korean'))
-					.setValue(this.plugin.settings.coachLanguage)
-					.onChange(async (value) => {
-						this.plugin.settings.coachLanguage = value === 'ko' ? 'ko' : value === 'en' ? 'en' : 'auto';
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		// Info-only row: no control added, renders name + description.
-		new Setting(containerEl)
-			.setName(t('settings.sharing.name'))
-			.setDesc(t('settings.sharing.desc'));
-
-		// --- Cloud sync (Premium, opt-in) ---
-		new Setting(containerEl).setName(t('settings.cloud.section')).setHeading();
-
-		new Setting(containerEl).setName(t('settings.cloud.sectionDesc'));
-
-		new Setting(containerEl)
-			.setName(t('settings.cloudEnabled.name'))
-			.setDesc(t('settings.cloudEnabled.desc'))
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.cloudEnabled).onChange(async (value) => {
-					this.plugin.settings.cloudEnabled = value;
-					await this.plugin.saveSettings();
-				}),
-			);
-
-		new Setting(containerEl).setName(t('settings.cloudStatus.name')).setDesc(this.cloudStatusText());
-
-		if (this.cloudShowUpsell()) {
-			new Setting(containerEl)
-				.setName(t('settings.cloudUpsell.name'))
-				.setDesc(t('settings.cloudUpsell.desc'));
-		}
-
-		if (this.plugin.settings.cloudEnabled) {
-			new Setting(containerEl)
-				.setName(t('settings.cloudPrivacy.name'))
-				.setDesc(t('settings.cloudPrivacy.desc'));
-
-			new Setting(containerEl)
-				.setName(t('settings.cloudApiKey.name'))
-				.setDesc(t('settings.cloudApiKey.desc'))
-				.addText((text) => {
-					this.configureCloudKeyInput(text);
-				});
-
-			const configFields: Array<{
-				name: string;
-				desc: string;
-				placeholder?: string;
-				get: () => string;
-				set: (v: string) => void;
-			}> = [
-				{
-					name: t('settings.cloudAuthDomain.name'),
-					desc: t('settings.cloudAuthDomain.desc'),
-					placeholder: 'my-app.firebaseapp.com',
-					get: () => this.plugin.settings.cloudAuthDomain,
-					set: (v) => {
-						this.plugin.settings.cloudAuthDomain = v;
-					},
-				},
-				{
-					name: t('settings.cloudProjectId.name'),
-					desc: t('settings.cloudProjectId.desc'),
-					get: () => this.plugin.settings.cloudProjectId,
-					set: (v) => {
-						this.plugin.settings.cloudProjectId = v;
-					},
-				},
-				{
-					name: t('settings.cloudAppId.name'),
-					desc: t('settings.cloudAppId.desc'),
-					get: () => this.plugin.settings.cloudAppId,
-					set: (v) => {
-						this.plugin.settings.cloudAppId = v;
-					},
-				},
-				{
-					name: t('settings.cloudStorageBucket.name'),
-					desc: t('settings.cloudStorageBucket.desc'),
-					get: () => this.plugin.settings.cloudStorageBucket,
-					set: (v) => {
-						this.plugin.settings.cloudStorageBucket = v;
-					},
-				},
-				{
-					name: t('settings.cloudMessagingSenderId.name'),
-					desc: t('settings.cloudMessagingSenderId.desc'),
-					get: () => this.plugin.settings.cloudMessagingSenderId,
-					set: (v) => {
-						this.plugin.settings.cloudMessagingSenderId = v;
-					},
-				},
-			];
-			for (const f of configFields) {
-				new Setting(containerEl)
-					.setName(f.name)
-					.setDesc(f.desc)
-					.addText((text) =>
-						text
-							.setPlaceholder(f.placeholder ?? '')
-							.setValue(f.get())
-							.onChange(async (value) => {
-								f.set(value.trim());
-								await this.plugin.saveSettings();
-							}),
-					);
-			}
-
-			new Setting(containerEl)
-				.setName(t('settings.cloudEmail.name'))
-				.setDesc(t('settings.cloudEmail.desc'))
-				.addText((text) =>
-					text
-						.setPlaceholder(t('settings.cloudEmail.placeholder'))
-						.setValue(this.plugin.settings.cloudEmail)
-						.onChange(async (value) => {
-							this.plugin.settings.cloudEmail = value.trim();
-							await this.plugin.saveSettings();
-						}),
-				);
-
-			new Setting(containerEl)
-				.setName(t('settings.cloudPassword.name'))
-				.setDesc(t('settings.cloudPassword.desc'))
-				.addText((text) => {
-					text.inputEl.type = 'password';
-					text.setPlaceholder(t('settings.cloudPassword.placeholder'));
-					text.onChange((value) => {
-						// Transient only: the password is never persisted.
-						this.cloudPassword = value;
-					});
-				});
-
-			const authRow = new Setting(containerEl);
-			this.renderCloudAuthButtons(authRow);
-		}
-	}
 }
+

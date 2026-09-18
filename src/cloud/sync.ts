@@ -6,11 +6,11 @@
 // an immediate cycle. Nothing runs unless the entitlement gate passes.
 
 import type { App } from 'obsidian';
-import type { FirebaseApp } from 'firebase/app';
 import type { Habit } from '../types';
 import type { HabitStore } from '../store';
 import { addDays, todayKey } from '../utils/dates';
 import type { CloudCheckEntry, CloudDailyLogDoc, CloudHabitDoc } from './types';
+import type { CloudTransport } from './transport';
 
 /** Debounce window after local changes before a push cycle starts. */
 export const SYNC_DEBOUNCE_MS = 30_000;
@@ -124,7 +124,7 @@ export class CloudSyncManager {
 	private disposed = false;
 
 	constructor(
-		private firebaseApp: FirebaseApp,
+		private transport: CloudTransport,
 		private deps: SyncDeps,
 	) {}
 
@@ -159,8 +159,6 @@ export class CloudSyncManager {
 		if (this.syncing || this.disposed) return { pushed: 0, pulled: 0 };
 		this.syncing = true;
 		try {
-			const { getFirestore, doc, setDoc, getDoc, getDocs, collection } = await import('firebase/firestore');
-			const db = getFirestore(this.firebaseApp);
 			const { store, uid, deviceId } = this.deps;
 			const now = new Date().toISOString();
 			const lastSyncAt = this.deps.getLastSyncAt();
@@ -171,19 +169,15 @@ export class CloudSyncManager {
 			const habits = await store.loadAllHabits();
 			const localHabitsAt = new Date(await store.getHabitsMtime()).toISOString();
 			for (const h of habits) {
-				const ref = doc(db, 'users', uid, 'habits', h.id);
-				const snap = await getDoc(ref);
-				const remote = snap.exists() ? (snap.data() as CloudHabitDoc) : null;
+				const remote = await this.transport.getHabitDoc(uid, h.id);
 				if (decideHabitSync(localHabitsAt, remote, lastSyncAt) !== 'pull') {
-					await setDoc(ref, buildHabitPayload(h, now), { merge: true });
+					await this.transport.setHabitDoc(uid, h.id, buildHabitPayload(h, now));
 					pushed++;
 				}
 			}
 
 			// 2. Pull habits: adopt unknown remote habits, pull newer ones.
-			const remoteHabits = new Map<string, CloudHabitDoc>();
-			const habitsSnap = await getDocs(collection(db, 'users', uid, 'habits'));
-			habitsSnap.forEach((d) => remoteHabits.set(d.id, d.data() as CloudHabitDoc));
+			const remoteHabits = await this.transport.listHabitDocs(uid);
 			const byId = new Map(habits.map((h) => [h.id, h]));
 			this.suppressUntil = Date.now() + APPLY_SUPPRESS_MS;
 			for (const [id, rh] of remoteHabits) {
@@ -221,9 +215,7 @@ export class CloudSyncManager {
 				for (const id of localChecks) {
 					localRec[id] = { done: true, updatedAt: localAt, deviceId };
 				}
-				const ref = doc(db, 'users', uid, 'dailyLogs', day);
-				const snap = await getDoc(ref);
-				const remoteDoc: CloudDailyLogDoc | null = snap.exists() ? (snap.data() as CloudDailyLogDoc) : null;
+				const remoteDoc = await this.transport.getDailyLog(uid, day);
 				const merged = mergeDailyLogChecks(localRec, remoteDoc?.checks ?? {});
 				// Apply to the vault only where the merged result differs.
 				for (const [id, entry] of Object.entries(merged)) {
@@ -236,9 +228,7 @@ export class CloudSyncManager {
 				// Push the merged doc unless the remote already matches.
 				const remoteChecks = remoteDoc?.checks;
 				if (!remoteChecks || JSON.stringify(merged) !== JSON.stringify(remoteChecks)) {
-					await setDoc(ref, { checks: merged, updatedAt: now } satisfies CloudDailyLogDoc, {
-						merge: true,
-					});
+					await this.transport.setDailyLog(uid, day, { checks: merged, updatedAt: now });
 					pushed++;
 				}
 			}

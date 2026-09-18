@@ -85,6 +85,9 @@ const en: Dict = {
 	'settings.cloudEnabled.name': 'Enable cloud sync',
 	'settings.cloudEnabled.desc':
 		'Off = fully local, exactly as before. On = sync via your Firebase project (Premium plan required).',
+	'settings.cloudUseMock.name': 'Use mock backend',
+	'settings.cloudUseMock.desc':
+		'On = in-memory mock (no Firebase config or network needed — for trying things out). Off = real Firebase project with the config below.',
 	'settings.cloudUpsell.name': 'Premium required',
 	'settings.cloudUpsell.desc':
 		'Cloud sync is a Premium feature. Your habits stay fully local on the free plan.',
@@ -277,6 +280,9 @@ const ko: Dict = {
 	'settings.cloudEnabled.name': '클라우드 동기화 켜기',
 	'settings.cloudEnabled.desc':
 		'끄기 = 기존과 동일한 완전 로컬 동작. 켜기 = Firebase 프로젝트로 동기화 (프리미엄 플랜 필요).',
+	'settings.cloudUseMock.name': '목 백엔드 사용',
+	'settings.cloudUseMock.desc':
+		'켜기 = 인메모리 목 (Firebase 설정·네트워크 불필요 — 체험용). 끄기 = 아래 설정의 실제 Firebase 프로젝트.',
 	'settings.cloudUpsell.name': '프리미엄 필요',
 	'settings.cloudUpsell.desc':
 		'클라우드 동기화는 프리미엄 기능입니다. 무료 플랜에서는 습관이 완전히 로컬에만 저장됩니다.',

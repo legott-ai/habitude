@@ -4,7 +4,7 @@
 // stored on-device, calling the provider directly. No Habitude backend, no
 // account, no sync.
 
-import { DEFAULT_COACH_MODEL, type LlmProviderId } from './coach/providers';
+import type { LlmProviderId } from './coach/providers';
 import type { CoachLanguage } from './coach/prompt';
 
 export interface Habit {
@@ -45,15 +45,18 @@ export interface PluginSettings {
 	llmModel: string;
 	/** base URL override; empty = provider default */
 	llmBaseUrl: string;
-	/** @deprecated migrated to llmApiKey (provider=gemini). Kept so existing users keep their key. */
-	geminiApiKey: string;
-	/** @deprecated migrated to llmModel. Kept so existing users keep their model. */
-	coachModel: string;
 	/** reply language for the coach */
 	coachLanguage: CoachLanguage;
 	// --- Cloud sync (Premium, opt-in) ---
 	/** master toggle; default off = byte-for-byte the existing local behavior */
 	cloudEnabled: boolean;
+	/**
+	 * Backend selector. true (default) = in-memory mock backend: works with
+	 * zero Firebase config, zero network. false = real Firebase SDK; the
+	 * Firebase web config below must be complete. `!== false` on purpose so
+	 * old settings (key absent) stay on the mock default.
+	 */
+	cloudUseMock: boolean;
 	/** Firebase web config (Firebase console → Project settings → Your apps). All empty by default. */
 	cloudApiKey: string;
 	cloudAuthDomain: string;
@@ -77,10 +80,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	llmApiKey: '',
 	llmModel: '',
 	llmBaseUrl: '',
-	geminiApiKey: '',
-	coachModel: DEFAULT_COACH_MODEL,
 	coachLanguage: 'auto',
 	cloudEnabled: false,
+	cloudUseMock: true,
 	cloudApiKey: '',
 	cloudAuthDomain: '',
 	cloudProjectId: '',
