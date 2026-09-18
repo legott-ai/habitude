@@ -10,6 +10,8 @@ export default defineConfig(
 		'test/coach/dist',
 		'test/settings/dist',
 		'test/share/dist',
+		'test/i18n/dist',
+		'test/cloud/dist',
 		'esbuild.config.mjs',
 		'version-bump.mjs',
 		'versions.json',

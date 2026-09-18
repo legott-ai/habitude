@@ -51,6 +51,22 @@ export interface PluginSettings {
 	coachModel: string;
 	/** reply language for the coach */
 	coachLanguage: CoachLanguage;
+	// --- Cloud sync (Premium, opt-in) ---
+	/** master toggle; default off = byte-for-byte the existing local behavior */
+	cloudEnabled: boolean;
+	/** Firebase web config (Firebase console → Project settings → Your apps). All empty by default. */
+	cloudApiKey: string;
+	cloudAuthDomain: string;
+	cloudProjectId: string;
+	cloudAppId: string;
+	cloudStorageBucket: string;
+	cloudMessagingSenderId: string;
+	/** last email used for cloud sign-in (not a secret; the password is never stored) */
+	cloudEmail: string;
+	/** per-device id for LWW tiebreaks; generated on first enable */
+	cloudDeviceId: string;
+	/** ISO timestamp of the last completed sync cycle; '' = never */
+	cloudLastSyncAt: string;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -64,6 +80,16 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	geminiApiKey: '',
 	coachModel: DEFAULT_COACH_MODEL,
 	coachLanguage: 'auto',
+	cloudEnabled: false,
+	cloudApiKey: '',
+	cloudAuthDomain: '',
+	cloudProjectId: '',
+	cloudAppId: '',
+	cloudStorageBucket: '',
+	cloudMessagingSenderId: '',
+	cloudEmail: '',
+	cloudDeviceId: '',
+	cloudLastSyncAt: '',
 };
 
 /**

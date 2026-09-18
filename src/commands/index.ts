@@ -94,6 +94,26 @@ export function registerCommands(plugin: HabitudePlugin): void {
 	});
 
 	plugin.addCommand({
+		id: 'habitude-cloud-sync-now',
+		name: t('cmd.syncNow'),
+		callback: () => {
+			const cloud = plugin.getCloud();
+			if (!cloud) {
+				new Notice(t('cmd.syncNowDisabled'));
+				return;
+			}
+			void (async () => {
+				try {
+					const r = await cloud.syncNow();
+					new Notice(t('cmd.syncDone', { pushed: r.pushed, pulled: r.pulled }));
+				} catch (e) {
+					new Notice(t('cmd.syncFailed', { detail: e instanceof Error ? e.message : String(e) }));
+				}
+			})();
+		},
+	});
+
+	plugin.addCommand({
 		id: 'toggle-today',
 		name: t('cmd.toggleToday'),
 		callback: () => {

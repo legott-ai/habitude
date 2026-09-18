@@ -17,7 +17,9 @@
 		"test:share": "esbuild test/share/share-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/share/dist/share-test.cjs --format=cjs --log-level=warning && node test/share/dist/share-test.cjs",
 		"test:i18n": "esbuild test/i18n/i18n-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/i18n/dist/i18n-test.cjs --format=cjs --log-level=warning && node test/i18n/dist/i18n-test.cjs",
 		"test:providers": "esbuild test/coach/providers-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/coach/dist/providers-test.cjs --format=cjs --log-level=warning && node test/coach/dist/providers-test.cjs",
-		"test:unit": "npm run test:coach && npm run test:edge && npm run test:settings && npm run test:checkmark && npm run test:share && npm run test:i18n && npm run test:providers"
+		"test:unit": "npm run test:coach && npm run test:edge && npm run test:settings && npm run test:checkmark && npm run test:share && npm run test:i18n && npm run test:providers",
+		"test:cloud": "esbuild test/cloud/cloud-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/cloud/dist/cloud-test.cjs --format=cjs --log-level=warning && node test/cloud/dist/cloud-test.cjs && esbuild test/cloud/load-probe.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --alias:firebase/app=./test/cloud/mock-firebase-app.ts --alias:firebase/auth=./test/cloud/mock-firebase-auth.ts --alias:firebase/firestore=./test/cloud/mock-firebase-firestore.ts --outfile=test/cloud/dist/load-probe.cjs --format=cjs --log-level=warning && node test/cloud/dist/load-probe.cjs && esbuild test/cloud/lazy-probe.ts --bundle --platform=node --alias:firebase/app=./test/cloud/mock-firebase-app.ts --alias:firebase/auth=./test/cloud/mock-firebase-auth.ts --alias:firebase/firestore=./test/cloud/mock-firebase-firestore.ts --outfile=test/cloud/dist/lazy-probe.cjs --format=cjs --log-level=warning && node test/cloud/dist/lazy-probe.cjs",
+		"test": "npm run test:unit && npm run test:cloud"
 	},
 	"keywords": [],
 	"license": "0-BSD",
@@ -32,5 +34,8 @@
 		"obsidian": "^1.13.1",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "^8.59.1"
+	},
+	"dependencies": {
+		"firebase": "^12.19.0"
 	}
 }

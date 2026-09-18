@@ -5,5 +5,6 @@ data.json
 test/stress/dist/
 test/coach/dist/
 test/settings/dist/
+test/cloud/dist/
 test/share/dist/
 test/i18n/dist/

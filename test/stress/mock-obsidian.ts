@@ -189,6 +189,31 @@ export class ColorPickerComponent {
 		this.changeCb?.(value);
 	}
 }
+/** Minimal chainable toggle for settings-UI tests. */
+export class ToggleComponent {
+	private changeCb: ((value: boolean) => void) | null = null;
+	setValue(_v: boolean): this {
+		return this;
+	}
+	onChange(cb: (value: boolean) => void): this {
+		this.changeCb = cb;
+		return this;
+	}
+}
+/** Minimal chainable button for settings-UI tests. */
+export class ButtonComponent {
+	private clickCb: (() => void) | null = null;
+	setButtonText(_t: string): this {
+		return this;
+	}
+	setDisabled(_d: boolean): this {
+		return this;
+	}
+	onClick(cb: () => void): this {
+		this.clickCb = cb;
+		return this;
+	}
+}
 /** Chainable Setting row; records instances so tests can find rows by name. */
 export class Setting {
 	static instances: Setting[] = [];
@@ -204,6 +229,9 @@ export class Setting {
 		return this;
 	}
 	setDesc(_d: string | DocumentFragment): this {
+		return this;
+	}
+	setHeading(): this {
 		return this;
 	}
 	addText(cb: (text: TextComponent) => unknown): this {
@@ -222,6 +250,14 @@ export class Setting {
 		const cp = new ColorPickerComponent();
 		this.colorPickers.push(cp);
 		cb(cp);
+		return this;
+	}
+	addToggle(cb: (toggle: ToggleComponent) => unknown): this {
+		cb(new ToggleComponent());
+		return this;
+	}
+	addButton(cb: (btn: ButtonComponent) => unknown): this {
+		cb(new ButtonComponent());
 		return this;
 	}
 }

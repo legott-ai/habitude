@@ -4,17 +4,23 @@
 // device's plugin data and is sent only to the selected provider — never
 // to Habitude servers.
 
-import { App, PluginSettingTab, Setting, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, TextComponent } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
 import { t } from './i18n';
 import type HabitudePlugin from './main';
 import { getProvider, LLM_PROVIDER_IDS, type LlmProviderId } from './coach/providers';
+import { canEnableCloudSync } from './cloud/entitlement';
+import { validateFirebaseWebConfig } from './cloud/config';
+import type { CloudCoordinator } from './cloud/coordinator';
 import { DEFAULT_SETTINGS, normalizeCheckmarkColor, type PluginSettings } from './types';
 
 export type { PluginSettings };
 export { DEFAULT_SETTINGS };
 
 export class HabitudeSettingTab extends PluginSettingTab {
+	/** Transient cloud password: entered for sign-in, never persisted. */
+	private cloudPassword = '';
+
 	constructor(app: App, private plugin: HabitudePlugin) {
 		super(app, plugin);
 	}
@@ -126,6 +132,124 @@ export class HabitudeSettingTab extends PluginSettingTab {
 				name: t('settings.sharing.name'),
 				desc: t('settings.sharing.desc'),
 			},
+			// --- Cloud sync (Premium, opt-in) ---
+			{
+				name: t('settings.cloud.section'),
+				desc: t('settings.cloud.sectionDesc'),
+			},
+			{
+				name: t('settings.cloudEnabled.name'),
+				desc: t('settings.cloudEnabled.desc'),
+				control: {
+					type: 'toggle',
+					key: 'cloudEnabled',
+					defaultValue: DEFAULT_SETTINGS.cloudEnabled,
+				},
+			},
+			{
+				name: t('settings.cloudStatus.name'),
+				desc: this.cloudStatusText(),
+			},
+			{
+				name: t('settings.cloudUpsell.name'),
+				desc: t('settings.cloudUpsell.desc'),
+				visible: () => this.cloudShowUpsell(),
+			},
+			{
+				name: t('settings.cloudPrivacy.name'),
+				desc: t('settings.cloudPrivacy.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+			},
+			{
+				name: t('settings.cloudApiKey.name'),
+				desc: t('settings.cloudApiKey.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				render: (setting) => {
+					setting.addText((text) => this.configureCloudKeyInput(text));
+				},
+			},
+			{
+				name: t('settings.cloudAuthDomain.name'),
+				desc: t('settings.cloudAuthDomain.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'text',
+					key: 'cloudAuthDomain',
+					placeholder: 'my-app.firebaseapp.com',
+					defaultValue: DEFAULT_SETTINGS.cloudAuthDomain,
+				},
+			},
+			{
+				name: t('settings.cloudProjectId.name'),
+				desc: t('settings.cloudProjectId.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'text',
+					key: 'cloudProjectId',
+					defaultValue: DEFAULT_SETTINGS.cloudProjectId,
+				},
+			},
+			{
+				name: t('settings.cloudAppId.name'),
+				desc: t('settings.cloudAppId.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'text',
+					key: 'cloudAppId',
+					defaultValue: DEFAULT_SETTINGS.cloudAppId,
+				},
+			},
+			{
+				name: t('settings.cloudStorageBucket.name'),
+				desc: t('settings.cloudStorageBucket.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'text',
+					key: 'cloudStorageBucket',
+					defaultValue: DEFAULT_SETTINGS.cloudStorageBucket,
+				},
+			},
+			{
+				name: t('settings.cloudMessagingSenderId.name'),
+				desc: t('settings.cloudMessagingSenderId.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'text',
+					key: 'cloudMessagingSenderId',
+					defaultValue: DEFAULT_SETTINGS.cloudMessagingSenderId,
+				},
+			},
+			{
+				name: t('settings.cloudEmail.name'),
+				desc: t('settings.cloudEmail.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				control: {
+					type: 'text',
+					key: 'cloudEmail',
+					placeholder: t('settings.cloudEmail.placeholder'),
+					defaultValue: DEFAULT_SETTINGS.cloudEmail,
+				},
+			},
+			{
+				name: t('settings.cloudPassword.name'),
+				desc: t('settings.cloudPassword.desc'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				render: (setting) => {
+					setting.addText((text) => {
+						text.inputEl.type = 'password';
+						text.setPlaceholder(t('settings.cloudPassword.placeholder'));
+						text.onChange((value) => {
+							// Transient only: the password is never persisted.
+							this.cloudPassword = value;
+						});
+					});
+				},
+			},
+			{
+				name: t('settings.cloud.section'),
+				visible: () => this.plugin.settings.cloudEnabled,
+				render: (setting) => this.renderCloudAuthButtons(setting),
+			},
 		];
 	}
 
@@ -158,6 +282,19 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			this.plugin.settings.llmBaseUrl = typeof value === 'string' ? value.trim() : '';
 		} else if (key === 'coachLanguage') {
 			this.plugin.settings.coachLanguage = value === 'ko' ? 'ko' : value === 'en' ? 'en' : 'auto';
+		} else if (key === 'cloudEnabled') {
+			this.plugin.settings.cloudEnabled = value === true;
+		} else if (
+			key === 'cloudAuthDomain' ||
+			key === 'cloudProjectId' ||
+			key === 'cloudAppId' ||
+			key === 'cloudStorageBucket' ||
+			key === 'cloudMessagingSenderId' ||
+			key === 'cloudEmail'
+		) {
+			this.plugin.settings[key] = typeof value === 'string' ? value.trim() : '';
+		} else if (key === 'cloudApiKey') {
+			this.plugin.settings.cloudApiKey = typeof value === 'string' ? value.trim() : '';
 		}
 		await this.plugin.saveSettings();
 	}
@@ -183,6 +320,171 @@ export class HabitudeSettingTab extends PluginSettingTab {
 				this.plugin.settings.llmApiKey = value.trim();
 				await this.plugin.saveSettings();
 			});
+	}
+
+	// --- Cloud sync (Premium, opt-in) ---
+
+	/**
+	 * Masked input for the Firebase API key. The input never pre-fills the
+	 * saved key into the DOM: a mask hint shows instead. Shared by the
+	 * declarative `render` escape hatch and the display() fallback.
+	 */
+	private configureCloudKeyInput(text: TextComponent): TextComponent {
+		text.inputEl.type = 'password';
+		return text
+			.setPlaceholder(
+				this.plugin.settings.cloudApiKey
+					? t('settings.cloudApiKey.savedPlaceholder')
+					: t('settings.cloudApiKey.emptyPlaceholder'),
+			)
+			.onChange(async (value) => {
+				this.plugin.settings.cloudApiKey = value.trim();
+				await this.plugin.saveSettings();
+			});
+	}
+
+	/**
+	 * The cloud coordinator, or null when cloud sync is disabled (or the
+	 * plugin object does not provide one, e.g. in tests). The settings tab
+	 * must never crash on a missing coordinator.
+	 */
+	private getCloudCoordinator(): CloudCoordinator | null {
+		const getCloud = (this.plugin as Partial<Pick<HabitudePlugin, 'getCloud'>>).getCloud;
+		return typeof getCloud === 'function' ? getCloud.call(this.plugin) : null;
+	}
+
+	/** Best-effort cloud status line (no network; cached state only). */
+	private cloudStatusText(): string {
+		const cloud = this.getCloudCoordinator();
+		if (!cloud) return t('settings.cloudStatus.disabled');
+		switch (cloud.getStatus()) {
+			case 'disabled':
+				return t('settings.cloudStatus.disabled');
+			case 'needs-config':
+				return t('settings.cloudStatus.needsConfig');
+			case 'signed-out':
+				return t('settings.cloudStatus.signedOut');
+			case 'not-premium':
+				return t('settings.cloudStatus.notPremium');
+			case 'ready':
+				return t('settings.cloudStatus.ready');
+			case 'error':
+				return t('settings.cloudStatus.error', { detail: cloud.getLastError() ?? '' });
+		}
+	}
+
+	/** Show the upsell row when sync is enabled but the account is not premium. */
+	private cloudShowUpsell(): boolean {
+		if (!this.plugin.settings.cloudEnabled) return false;
+		return !canEnableCloudSync(this.getCloudCoordinator()?.getEntitlement() ?? null);
+	}
+
+	/** Sign in / sign up / sign out / sync-now buttons (both settings paths). */
+	private renderCloudAuthButtons(setting: Setting): void {
+		const email = this.getCloudCoordinator()?.getCurrentUserEmail();
+		if (email) {
+			setting.setName(t('settings.cloudSignedInAs', { email }));
+			setting.addButton((btn) =>
+				btn.setButtonText(t('settings.cloudSyncNow')).onClick(() => {
+					void this.doCloudSyncNow();
+				}),
+			);
+			setting.addButton((btn) =>
+				btn.setButtonText(t('settings.cloudSignOut')).onClick(() => {
+					void this.doCloudSignOut();
+				}),
+			);
+		} else {
+			setting.setName(t('settings.cloudNotSignedIn'));
+			setting.addButton((btn) =>
+				btn.setButtonText(t('settings.cloudSignIn')).onClick(() => {
+					void this.doCloudSignIn();
+				}),
+			);
+			setting.addButton((btn) =>
+				btn.setButtonText(t('settings.cloudSignUp')).onClick(() => {
+					void this.doCloudSignUp();
+				}),
+			);
+			// Honest disabled button: Google sign-in cannot complete a
+			// redirect back into Obsidian's Electron shell, so it is not
+			// shipped as a working button.
+			setting.addButton((btn) => btn.setButtonText(t('settings.cloudGoogleSoon')).setDisabled(true));
+		}
+	}
+
+	private cloudCredentials(): { email: string; password: string } | null {
+		const email = this.plugin.settings.cloudEmail.trim();
+		if (!email || !this.cloudPassword) {
+			new Notice(t('settings.cloudCredentialsRequired'));
+			return null;
+		}
+		return { email, password: this.cloudPassword };
+	}
+
+	private async doCloudSignIn(): Promise<void> {
+		const cloud = this.getCloudCoordinator();
+		if (!cloud) {
+			new Notice(t('cmd.syncNowDisabled'));
+			return;
+		}
+		const missing = validateFirebaseWebConfig(this.plugin.settings);
+		if (missing.length > 0) {
+			new Notice(t('settings.cloudConfigIncomplete', { fields: missing.join(', ') }));
+			return;
+		}
+		const creds = this.cloudCredentials();
+		if (!creds) return;
+		try {
+			await cloud.signIn(creds.email, creds.password);
+			this.cloudPassword = '';
+			new Notice(t('settings.cloudSignedInAs', { email: creds.email }));
+		} catch (e) {
+			new Notice(e instanceof Error ? e.message : String(e));
+		}
+	}
+
+	private async doCloudSignUp(): Promise<void> {
+		const cloud = this.getCloudCoordinator();
+		if (!cloud) {
+			new Notice(t('cmd.syncNowDisabled'));
+			return;
+		}
+		const missing = validateFirebaseWebConfig(this.plugin.settings);
+		if (missing.length > 0) {
+			new Notice(t('settings.cloudConfigIncomplete', { fields: missing.join(', ') }));
+			return;
+		}
+		const creds = this.cloudCredentials();
+		if (!creds) return;
+		try {
+			await cloud.signUp(creds.email, creds.password);
+			this.cloudPassword = '';
+			new Notice(t('settings.cloudSignedInAs', { email: creds.email }));
+		} catch (e) {
+			new Notice(e instanceof Error ? e.message : String(e));
+		}
+	}
+
+	private async doCloudSignOut(): Promise<void> {
+		const cloud = this.getCloudCoordinator();
+		if (!cloud) return;
+		await cloud.signOut();
+		new Notice(t('settings.cloudNotSignedIn'));
+	}
+
+	private async doCloudSyncNow(): Promise<void> {
+		const cloud = this.getCloudCoordinator();
+		if (!cloud) {
+			new Notice(t('cmd.syncNowDisabled'));
+			return;
+		}
+		try {
+			const r = await cloud.syncNow();
+			new Notice(t('cmd.syncDone', { pushed: r.pushed, pulled: r.pulled }));
+		} catch (e) {
+			new Notice(t('cmd.syncFailed', { detail: e instanceof Error ? e.message : String(e) }));
+		}
 	}
 
 	/** Fallback for Obsidian < 1.13.0 (bypassed when getSettingDefinitions runs). */
@@ -299,5 +601,133 @@ export class HabitudeSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(t('settings.sharing.name'))
 			.setDesc(t('settings.sharing.desc'));
+
+		// --- Cloud sync (Premium, opt-in) ---
+		new Setting(containerEl).setName(t('settings.cloud.section')).setHeading();
+
+		new Setting(containerEl).setName(t('settings.cloud.sectionDesc'));
+
+		new Setting(containerEl)
+			.setName(t('settings.cloudEnabled.name'))
+			.setDesc(t('settings.cloudEnabled.desc'))
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.cloudEnabled).onChange(async (value) => {
+					this.plugin.settings.cloudEnabled = value;
+					await this.plugin.saveSettings();
+				}),
+			);
+
+		new Setting(containerEl).setName(t('settings.cloudStatus.name')).setDesc(this.cloudStatusText());
+
+		if (this.cloudShowUpsell()) {
+			new Setting(containerEl)
+				.setName(t('settings.cloudUpsell.name'))
+				.setDesc(t('settings.cloudUpsell.desc'));
+		}
+
+		if (this.plugin.settings.cloudEnabled) {
+			new Setting(containerEl)
+				.setName(t('settings.cloudPrivacy.name'))
+				.setDesc(t('settings.cloudPrivacy.desc'));
+
+			new Setting(containerEl)
+				.setName(t('settings.cloudApiKey.name'))
+				.setDesc(t('settings.cloudApiKey.desc'))
+				.addText((text) => {
+					this.configureCloudKeyInput(text);
+				});
+
+			const configFields: Array<{
+				name: string;
+				desc: string;
+				placeholder?: string;
+				get: () => string;
+				set: (v: string) => void;
+			}> = [
+				{
+					name: t('settings.cloudAuthDomain.name'),
+					desc: t('settings.cloudAuthDomain.desc'),
+					placeholder: 'my-app.firebaseapp.com',
+					get: () => this.plugin.settings.cloudAuthDomain,
+					set: (v) => {
+						this.plugin.settings.cloudAuthDomain = v;
+					},
+				},
+				{
+					name: t('settings.cloudProjectId.name'),
+					desc: t('settings.cloudProjectId.desc'),
+					get: () => this.plugin.settings.cloudProjectId,
+					set: (v) => {
+						this.plugin.settings.cloudProjectId = v;
+					},
+				},
+				{
+					name: t('settings.cloudAppId.name'),
+					desc: t('settings.cloudAppId.desc'),
+					get: () => this.plugin.settings.cloudAppId,
+					set: (v) => {
+						this.plugin.settings.cloudAppId = v;
+					},
+				},
+				{
+					name: t('settings.cloudStorageBucket.name'),
+					desc: t('settings.cloudStorageBucket.desc'),
+					get: () => this.plugin.settings.cloudStorageBucket,
+					set: (v) => {
+						this.plugin.settings.cloudStorageBucket = v;
+					},
+				},
+				{
+					name: t('settings.cloudMessagingSenderId.name'),
+					desc: t('settings.cloudMessagingSenderId.desc'),
+					get: () => this.plugin.settings.cloudMessagingSenderId,
+					set: (v) => {
+						this.plugin.settings.cloudMessagingSenderId = v;
+					},
+				},
+			];
+			for (const f of configFields) {
+				new Setting(containerEl)
+					.setName(f.name)
+					.setDesc(f.desc)
+					.addText((text) =>
+						text
+							.setPlaceholder(f.placeholder ?? '')
+							.setValue(f.get())
+							.onChange(async (value) => {
+								f.set(value.trim());
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
+
+			new Setting(containerEl)
+				.setName(t('settings.cloudEmail.name'))
+				.setDesc(t('settings.cloudEmail.desc'))
+				.addText((text) =>
+					text
+						.setPlaceholder(t('settings.cloudEmail.placeholder'))
+						.setValue(this.plugin.settings.cloudEmail)
+						.onChange(async (value) => {
+							this.plugin.settings.cloudEmail = value.trim();
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			new Setting(containerEl)
+				.setName(t('settings.cloudPassword.name'))
+				.setDesc(t('settings.cloudPassword.desc'))
+				.addText((text) => {
+					text.inputEl.type = 'password';
+					text.setPlaceholder(t('settings.cloudPassword.placeholder'));
+					text.onChange((value) => {
+						// Transient only: the password is never persisted.
+						this.cloudPassword = value;
+					});
+				});
+
+			const authRow = new Setting(containerEl);
+			this.renderCloudAuthButtons(authRow);
+		}
 	}
 }

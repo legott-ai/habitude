@@ -10,14 +10,22 @@ import { CHECKLIST_VIEW_TYPE, ChecklistView } from './ui/checklist-view';
 import { COACH_VIEW_TYPE, CoachView } from './ui/coach-view';
 import { registerCommands } from './commands';
 import { todayKey } from './utils/dates';
+import { CloudCoordinator } from './cloud/coordinator';
+import { ensureDeviceId } from './cloud/config';
 
 export default class HabitudePlugin extends Plugin {
 	settings!: PluginSettings;
 	private store: HabitStore | null = null;
 	private statusBarEl: HTMLElement | null = null;
+	/**
+	 * Cloud coordinator. Null unless the user enabled cloud sync. Cheap to
+	 * create (no network, no Firebase bytes); the SDK loads lazily inside.
+	 */
+	private cloud: CloudCoordinator | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
+		await this.reconcileCloud();
 
 		this.registerView(CHECKLIST_VIEW_TYPE, (leaf) =>
 			new ChecklistView(leaf, {
@@ -54,6 +62,9 @@ export default class HabitudePlugin extends Plugin {
 				timer = window.setTimeout(() => {
 					this.refreshViews();
 					void this.updateStatusBar();
+					// Local change (possibly a habit/log edit): feed the
+					// debounced cloud push. No-op unless sync is ready.
+					this.cloud?.markLocalChange();
 				}, 400);
 			}),
 		);
@@ -61,6 +72,33 @@ export default class HabitudePlugin extends Plugin {
 
 	onunload(): void {
 		// Views and listeners are cleaned up by Obsidian via registerView/registerEvent.
+		this.cloud?.dispose();
+		this.cloud = null;
+	}
+
+	/** The cloud coordinator, or null when cloud sync is disabled. */
+	getCloud(): CloudCoordinator | null {
+		return this.cloud;
+	}
+
+	/**
+	 * Keep the coordinator in step with the toggle. Cheap and idempotent:
+	 * creates/disposes the coordinator and ensures a device id, but never
+	 * touches the network (Firebase loads lazily on sign-in/sync).
+	 */
+	async reconcileCloud(): Promise<void> {
+		if (!this.settings.cloudEnabled) {
+			this.cloud?.dispose();
+			this.cloud = null;
+			return;
+		}
+		if (!this.cloud) {
+			this.cloud = CloudCoordinator.create(this);
+		}
+		if (!this.settings.cloudDeviceId) {
+			this.settings.cloudDeviceId = ensureDeviceId(this.settings);
+			await this.saveData(this.settings);
+		}
 	}
 
 	async activateView(): Promise<void> {
@@ -159,5 +197,8 @@ export default class HabitudePlugin extends Plugin {
 		this.store = null;
 		this.refreshViews();
 		void this.updateStatusBar();
+		// Cloud toggle may have flipped: create/dispose the coordinator.
+		// Never touches the network (Firebase loads lazily).
+		await this.reconcileCloud();
 	}
 }

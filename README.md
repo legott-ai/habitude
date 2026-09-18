@@ -47,6 +47,11 @@ Both files are human-readable and hand-editable. The plugin re-reads them on eve
 - **Progress graphs: fully local.** Rendered in the app from your check data as SVG. No network involved.
 - **Share progress: explicit opt-in.** Only aggregate statistics (habit titles, streaks, completion rates) are ever transmitted — never your note contents. The payload is `{version, pluginVersion, generatedAt, stats: {habits: [{title, streak, weekRate}]}}` posted to `https://habi.sh/api/share`; nothing is sent unless you click the button.
 - **AI coach: opt-in BYOK.** The coach only activates if you pick a provider and — for cloud providers — paste your own API key (free tiers exist for Gemini, OpenAI, Anthropic, and OpenRouter). The key is stored only on this device, and requests go **directly to the provider you selected** — never to Habitude servers. Each message carries your habit *statistics* (streaks, rates, patterns), never your raw note text. Local providers (Ollama, LM Studio) need no key at all.
+- **Cloud sync (Premium): opt-in, off by default.** Free = the plugin stays fully local, exactly as described above. If you enable **Cloud sync** in settings, the plugin uses **Firebase (Google)** as the sync backend.
+  - **Exactly what is sent:** habit titles, check booleans, check timestamps, and streak aggregates. Payload shape: `users/{uid}/habits/{habitId}` → `{title, schedule, createdAt, archived, updatedAt}`; `users/{uid}/dailyLogs/{YYYY-MM-DD}` → `{checks: {[habitId]: {done, updatedAt, deviceId}}, updatedAt}`; `users/{uid}/entitlement` → your plan status.
+  - **Never sent:** your journal/note contents, filenames, and vault paths. The sync payload is built from an explicit field allowlist — anything else cannot reach the wire.
+  - **Risks:** sync needs a Habitude account (email/password); your habit data is stored on Google's servers under Google's terms. The Firebase web config (API key etc.) lives only in your local plugin data — you paste it from the Firebase console, and it is never committed to this repo.
+  - The Firebase SDK loads **only** when you enable cloud sync. With sync off, the plugin makes zero Firebase network calls and loads zero Firebase code.
 - The only other thing that ever leaves Obsidian is you: the *Get AI coaching* button opens `https://habitude.ai` in your browser.
 
 ## Development

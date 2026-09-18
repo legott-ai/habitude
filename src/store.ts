@@ -135,6 +135,36 @@ export class HabitStore {
 		return (await this.loadAllHabitsRaw()).filter((h) => !h.archived);
 	}
 
+	/** All habits including archived (for cloud sync). */
+	async loadAllHabits(): Promise<Habit[]> {
+		return this.loadAllHabitsRaw();
+	}
+
+	/** Insert or replace a habit by id (used when applying cloud changes). */
+	async upsertHabit(habit: Habit): Promise<void> {
+		const all = await this.loadAllHabitsRaw();
+		const idx = all.findIndex((h) => h.id === habit.id);
+		if (idx >= 0) {
+			all[idx] = habit;
+		} else {
+			all.push(habit);
+		}
+		await this.saveAllHabits(all);
+	}
+
+	/** mtime (ms) of Habits.md; 0 when absent. Used as the local LWW stamp. */
+	async getHabitsMtime(): Promise<number> {
+		const path = normalizePath(`${this.dataFolder}/${HABITS_FILE}`);
+		const file = asFile(this.app.vault.getAbstractFileByPath(path));
+		return file?.stat?.mtime ?? 0;
+	}
+
+	/** mtime (ms) of a daily log file; 0 when absent. Used as the local LWW stamp. */
+	async getDayLogMtime(dateKey: string): Promise<number> {
+		const file = asFile(this.app.vault.getAbstractFileByPath(this.logPath(dateKey)));
+		return file?.stat?.mtime ?? 0;
+	}
+
 	async addHabit(title: string): Promise<Habit> {
 		const all = await this.loadAllHabitsRaw();
 		const base = slugify(title);
