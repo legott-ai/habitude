@@ -304,21 +304,32 @@ export function getProvider(id: string): ProviderDef {
 	return (PROVIDERS as Record<string, ProviderDef>)[id] ?? PROVIDERS.gemini;
 }
 
-function classifyTransportError(e: unknown, providerLabel: string): CoachError {
+function classifyTransportError(e: unknown, def: ProviderDef): CoachError {
 	// Obsidian's requestUrl REJECTS on HTTP 4xx/5xx with the status on the
 	// error — classify those instead of blaming the connection.
 	const status =
 		typeof (e as { status?: unknown } | null | undefined)?.status === 'number'
 			? (e as { status: number }).status
 			: 0;
-	if (status === 400 || status === 401 || status === 403) {
+	if (status === 401 || status === 403) {
 		return new CoachError('auth', t('coach.error.authRejected'));
 	}
 	if (status === 429) {
 		return new CoachError('quota', t('coach.error.rateLimit'));
 	}
+	if (status === 400 && !def.needsKey) {
+		// Verified live (2026-09-17): LM Studio's server answers an unknown
+		// model name with HTTP 400. Keyless local providers send no API key,
+		// so reporting "key rejected" would mislead — surface it as a
+		// provider error instead.
+		return new CoachError('api', t('coach.error.httpError', { provider: def.label, status }));
+	}
+	if (status === 400) {
+		// Keyed providers (e.g. Gemini) may reject an invalid key with 400.
+		return new CoachError('auth', t('coach.error.authRejected'));
+	}
 	if (status >= 400) {
-		return new CoachError('api', t('coach.error.httpError', { provider: providerLabel, status }));
+		return new CoachError('api', t('coach.error.httpError', { provider: def.label, status }));
 	}
 	return new CoachError('network', t('coach.error.network', { detail: String(e) }));
 }
@@ -389,7 +400,7 @@ export async function chatCompletion(
 		const res = await requestFn({ url, method: 'POST', headers, body });
 		raw = res.text;
 	} catch (e) {
-		throw classifyTransportError(e, def.label);
+		throw classifyTransportError(e, def);
 	}
 
 	let data: unknown;

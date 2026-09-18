@@ -195,6 +195,23 @@ async function testErrorClassification(): Promise<void> {
 	};
 	const viaClient = (t: () => Promise<{ text: string }>) => () => chatCompletion(base, t as never);
 	await expectKind('thrown 401 → auth', viaClient(rejectWith(Object.assign(new Error('x'), { status: 401 }))), 'auth');
+
+	// Live-verified (2026-09-17): LM Studio answers an unknown model name
+	// with HTTP 400. Keyless local providers must not report "key rejected".
+	const local = { ...base, provider: 'lmstudio' as LlmProviderId, apiKey: '' };
+	await expectKind(
+		'thrown 400 with lmstudio → api',
+		() => chatCompletion(local, rejectWith(Object.assign(new Error('x'), { status: 400 })) as never),
+		'api',
+	);
+	const ollamaLocal = { ...base, provider: 'ollama' as LlmProviderId, apiKey: '' };
+	await expectKind(
+		'thrown 400 with ollama → api',
+		() => chatCompletion(ollamaLocal, rejectWith(Object.assign(new Error('x'), { status: 400 })) as never),
+		'api',
+	);
+	// Keyed providers may reject an invalid key with 400 — keep auth there.
+	await expectKind('thrown 400 with openai → auth', viaClient(rejectWith(Object.assign(new Error('x'), { status: 400 }))), 'auth');
 	await expectKind('thrown 429 → quota', viaClient(rejectWith(Object.assign(new Error('x'), { status: 429 }))), 'quota');
 	await expectKind('thrown 500 → api', viaClient(rejectWith(Object.assign(new Error('x'), { status: 500 }))), 'api');
 	await expectKind('reject without status → network', viaClient(rejectWith(new Error('socket hangup'))), 'network');
