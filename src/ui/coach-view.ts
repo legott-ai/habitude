@@ -20,6 +20,7 @@ import {
 	type LlmProviderId,
 } from '../coach/providers';
 import { buildGreeting, buildSystemPrompt } from '../coach/prompt';
+import { renderCompanionCard } from './companion-card';
 
 export const COACH_VIEW_TYPE = 'habitude-coach-view';
 
@@ -28,6 +29,7 @@ export class CoachView extends ItemView {
 	private messages: ChatMessage[] = [];
 	private sending = false;
 	private greeted = false;
+	private companionHost: HTMLElement | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: HabitudePlugin) {
 		super(leaf);
@@ -62,12 +64,27 @@ export class CoachView extends ItemView {
 	async render(): Promise<void> {
 		const container = this.containerEl.children[1] as HTMLElement;
 		container.empty();
+		this.companionHost = null;
 		container.addClass('habitude-coach');
 		if (!this.hasCredentials()) {
 			this.renderSetup(container);
+			this.companionHost = container.createDiv();
+			this.refreshCompanionPrompt();
 		} else {
 			await this.renderChat(container);
 		}
+	}
+
+	/** Preference changes must not clear an API-key or message draft. */
+	refreshCompanionPrompt(): void {
+		this.companionHost?.empty();
+		if (!this.companionHost || !this.plugin.settings.showCompanionPrompts) return;
+		renderCompanionCard(this.companionHost, {
+			entryPoint: 'coach',
+			reason: 'coach',
+			onExplore: () => this.plugin.openCompanion('coach'),
+			onDismiss: () => { void this.plugin.hideCompanionPrompts(); },
+		});
 	}
 
 	// -- Setup (no key yet, or provider without a key) -----------------------

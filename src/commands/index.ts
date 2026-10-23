@@ -71,6 +71,18 @@ class HabitSuggestModal extends SuggestModal<HabitChoice> {
 
 export function registerCommands(plugin: HabitudePlugin): void {
 	plugin.addCommand({
+		id: 'export-habits',
+		name: t('transfer.command'),
+		callback: () => plugin.openHabitExport(),
+	});
+
+	plugin.addCommand({
+		id: 'explore-habitude',
+		name: t('cmd.exploreHabitude'),
+		callback: () => plugin.openCompanion('command'),
+	});
+
+	plugin.addCommand({
 		id: 'open-checklist',
 		name: t('cmd.openChecklist'),
 		callback: () => void openChecklist(plugin),
@@ -89,7 +101,11 @@ export function registerCommands(plugin: HabitudePlugin): void {
 			const store = plugin.getStore();
 			const weekStartKey = startOfWeek(todayKey(), plugin.settings.weekStart);
 			const weekKeys = Array.from({ length: 7 }, (_, i) => addDays(weekStartKey, i));
-			new ReviewModal(plugin.app, store, weekKeys).open();
+			new ReviewModal(plugin.app, store, weekKeys, {
+				showCompanionPrompts: () => plugin.settings.showCompanionPrompts,
+				onExplore: () => plugin.openCompanion('review'),
+				onDismiss: () => plugin.hideCompanionPrompts(),
+			}).open();
 		},
 	});
 

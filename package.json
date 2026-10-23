@@ -18,7 +18,9 @@
 		"test:share": "esbuild test/share/share-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/share/dist/share-test.cjs --format=cjs --log-level=warning && node test/share/dist/share-test.cjs",
 		"test:i18n": "esbuild test/i18n/i18n-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/i18n/dist/i18n-test.cjs --format=cjs --log-level=warning && node test/i18n/dist/i18n-test.cjs",
 		"test:providers": "esbuild test/coach/providers-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/coach/dist/providers-test.cjs --format=cjs --log-level=warning && node test/coach/dist/providers-test.cjs",
-		"test:unit": "npm run test:coach && npm run test:edge && npm run test:settings && npm run test:checkmark && npm run test:migration && npm run test:share && npm run test:i18n && npm run test:providers"
+		"test:unit": "npm run test:coach && npm run test:edge && npm run test:settings && npm run test:checkmark && npm run test:migration && npm run test:share && npm run test:i18n && npm run test:providers && npm run test:companion && npm run test:transfer",
+		"test:companion": "esbuild test/companion/companion-test.ts test/companion/integration-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outdir=test/companion/dist --out-extension:.js=.cjs --format=cjs --log-level=warning && node test/companion/dist/companion-test.cjs && node test/companion/dist/integration-test.cjs",
+		"test:transfer": "esbuild test/transfer/transfer-test.ts --bundle --platform=node --alias:obsidian=./test/stress/mock-obsidian.ts --outfile=test/transfer/dist/transfer-test.cjs --format=cjs --log-level=warning && node test/transfer/dist/transfer-test.cjs"
 	},
 	"keywords": [],
 	"license": "0-BSD",

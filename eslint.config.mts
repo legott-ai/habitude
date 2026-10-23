@@ -5,11 +5,16 @@ import { globalIgnores, defineConfig } from 'eslint/config';
 export default defineConfig(
 	globalIgnores([
 		'node_modules',
+		'.deps-cache',
+		'test-vault',
 		'dist',
 		'test/stress/dist',
 		'test/coach/dist',
 		'test/settings/dist',
 		'test/share/dist',
+		'test/i18n/dist',
+		'test/companion/dist',
+		'test/transfer/dist',
 		'esbuild.config.mjs',
 		'version-bump.mjs',
 		'versions.json',
@@ -49,6 +54,8 @@ export default defineConfig(
 			'no-console': 'off',
 			'obsidianmd/rule-custom-message': 'off',
 			'obsidianmd/no-nodejs-modules': 'off',
+			// Node harnesses intercept globals to prove no browser I/O occurs.
+			'obsidianmd/no-global-this': 'off',
 		},
 	},
 );

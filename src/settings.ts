@@ -10,6 +10,7 @@ import { t } from './i18n';
 import type HabitudePlugin from './main';
 import { getProvider, LLM_PROVIDER_IDS, type LlmProviderId } from './coach/providers';
 import { DEFAULT_SETTINGS, normalizeCheckmarkColor, type PluginSettings } from './types';
+import { normalizeCompanionPrompts } from './companion';
 
 export type { PluginSettings };
 export { DEFAULT_SETTINGS };
@@ -36,6 +37,32 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			providerOptions[id] = t(`settings.provider.${id}`);
 		}
 		return [
+			{
+				name: t('transfer.title'),
+				desc: t('transfer.settingsDesc'),
+				render: (setting) => {
+					setting.addButton((button) => button.setButtonText(t('transfer.preview'))
+						.onClick(() => this.plugin.openHabitExport()));
+				},
+			},
+			{
+				name: t('settings.companionExplore.name'),
+				desc: t('settings.companionExplore.desc'),
+				render: (setting) => {
+					setting.addButton((button) => button
+						.setButtonText(t('settings.companionExplore.button'))
+						.onClick(() => this.plugin.openCompanion('settings')));
+				},
+			},
+			{
+				name: t('settings.companionPrompts.name'),
+				desc: t('settings.companionPrompts.desc'),
+				control: {
+					type: 'toggle',
+					key: 'showCompanionPrompts',
+					defaultValue: DEFAULT_SETTINGS.showCompanionPrompts,
+				},
+			},
 			{
 				name: t('settings.dataFolder.name'),
 				desc: t('settings.dataFolder.desc'),
@@ -133,6 +160,10 @@ export class HabitudeSettingTab extends PluginSettingTab {
 	}
 
 	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key === 'showCompanionPrompts') {
+			await this.plugin.setCompanionPrompts(normalizeCompanionPrompts(value));
+			return;
+		}
 		if (key === 'weekStart') {
 			this.plugin.settings.weekStart = value === '0' ? 0 : 1;
 		} else if (key === 'checkmarkColor') {

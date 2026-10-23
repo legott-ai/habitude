@@ -12,6 +12,7 @@
 
 .habitude-header {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
 }
@@ -19,6 +20,7 @@
 .habitude-week-label {
 	font-weight: 600;
 	font-size: 1.05em;
+	white-space: nowrap;
 }
 
 .habitude-nav-btn,
@@ -64,8 +66,14 @@
 	color: var(--text-muted);
 }
 
+.habitude-grid-wrap {
+	overflow-x: auto;
+	flex-shrink: 0;
+}
+
 .habitude-grid {
 	width: 100%;
+	min-width: 380px;
 	border-collapse: collapse;
 	table-layout: fixed;
 }
@@ -88,10 +96,28 @@
 }
 
 .habitude-habit-title {
+	flex: 1;
+	min-width: 0;
 	font-weight: 600;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.habitude-title-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.habitude-menu-btn {
+	flex-shrink: 0;
+	width: 24px;
+	min-width: 24px;
+	height: 24px;
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
 }
 
 .habitude-habit-meta {
@@ -117,6 +143,7 @@
 .habitude-toggle {
 	cursor: pointer;
 	width: 30px;
+	min-width: 30px;
 	height: 30px;
 	border-radius: 50%;
 	border: 2px solid var(--background-modifier-border);
@@ -423,4 +450,245 @@
 	margin: 0;
 	font-size: 0.85em;
 	color: var(--text-muted);
+}
+
+/* Local companion overview and optional contextual suggestions. */
+.habitude-companion-card {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-secondary);
+	text-align: start;
+}
+
+.habitude-companion-card-copy {
+	min-width: 0;
+}
+
+.habitude-companion-card-copy strong {
+	font-size: var(--font-ui-small);
+}
+
+.habitude-companion-card-copy p {
+	margin: 4px 0 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
+}
+
+.habitude-companion-card-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.habitude-companion-card-actions button {
+	min-height: 32px;
+	white-space: normal;
+	height: auto;
+	font-size: var(--font-ui-smaller);
+}
+
+.habitude-companion-dismiss {
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.habitude-companion-modal {
+	width: min(800px, calc(100vw - 32px));
+	max-width: 100%;
+}
+
+.habitude-companion {
+	line-height: 1.5;
+}
+
+.habitude-companion h3,
+.habitude-companion h4 {
+	margin: 0;
+	font-size: var(--font-ui-medium);
+}
+
+.habitude-companion-intro {
+	margin: 0 0 16px;
+	color: var(--text-muted);
+}
+
+.habitude-companion-current,
+.habitude-companion-privacy {
+	padding: 12px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-secondary);
+}
+
+.habitude-companion-current p,
+.habitude-companion-privacy p {
+	margin: 6px 0 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.habitude-companion-plan-header {
+	margin-top: 20px;
+}
+
+.habitude-companion-plan-header p {
+	margin: 6px 0 12px;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.habitude-companion-billing {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin: 0 0 12px;
+	padding: 8px 0 0;
+	border: 0;
+}
+
+.habitude-companion-billing legend {
+	padding: 0;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.habitude-companion-billing-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 32px;
+	cursor: pointer;
+}
+
+.habitude-companion-billing-option input {
+	margin: 0;
+}
+
+.habitude-companion-plans {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.habitude-companion-plan {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	padding: 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+}
+
+.habitude-companion-plan-heading {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 4px 8px;
+}
+
+.habitude-companion-badge {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.habitude-companion-price {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 14px 0 8px;
+}
+
+.habitude-companion-price strong {
+	font-size: 1.25em;
+	font-variant-numeric: tabular-nums;
+}
+
+.habitude-companion-price span,
+.habitude-companion-plan-note {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.habitude-companion-plan ul {
+	margin: 8px 0 12px;
+	padding-inline-start: 18px;
+	font-size: var(--font-ui-small);
+}
+
+.habitude-companion-plan li + li {
+	margin-top: 6px;
+}
+
+.habitude-companion-plan-note {
+	margin: auto 0 0;
+}
+
+.habitude-companion-note {
+	margin: 10px 0 16px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.habitude-companion-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.habitude-companion-link,
+.habitude-companion-actions button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 36px;
+	height: auto;
+	padding: 8px 12px;
+	border-radius: var(--button-radius, 5px);
+	font-size: var(--font-ui-small);
+	line-height: 1.4;
+	text-align: center;
+	white-space: normal;
+}
+
+.habitude-companion-link.mod-cta {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	text-decoration: none;
+}
+
+.habitude-companion-link.mod-cta:hover {
+	background: var(--interactive-accent-hover);
+}
+
+.habitude-companion :is(button, a, input):focus-visible,
+.habitude-companion-card button:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 3px;
+}
+
+@media (max-width: 620px) {
+	.habitude-companion-plans {
+		grid-template-columns: 1fr;
+	}
+
+	.habitude-companion-actions > * {
+		flex: 1 1 100%;
+	}
+}
+
+@media (pointer: coarse) {
+	.habitude-companion-card-actions button,
+	.habitude-companion-actions > *,
+	.habitude-companion-billing-option {
+		min-height: 44px;
+	}
 }
