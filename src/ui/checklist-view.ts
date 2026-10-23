@@ -5,7 +5,8 @@ import { ItemView, Menu, Notice, WorkspaceLeaf } from 'obsidian';
 import { t } from '../i18n';
 import type { HabitStore } from '../store';
 import type { Habit } from '../types';
-import { COACHING_URL } from '../types';
+import { recommendCompanion, type CompanionContext, type CompanionEntryPoint } from '../companion';
+import { renderCompanionCard } from './companion-card';
 import { recentKeys, streakFor, weekRateFor } from '../stats';
 import { historyStripSvg, weeklyBarsSvg, type GraphDay } from '../graphs';
 import { shareFromStore } from '../share';
@@ -27,6 +28,10 @@ interface ViewDeps {
 	/** '#rrggbb' color for the ✓ check mark glyph */
 	getCheckmarkColor: () => string;
 	getPluginVersion: () => string;
+	getShowCompanionPrompts: () => boolean;
+	getCoachConfigured: () => boolean;
+	onExploreCompanion: (entryPoint: CompanionEntryPoint) => void;
+	onHideCompanionPrompts: () => Promise<void>;
 }
 
 export class ChecklistView extends ItemView {
@@ -34,6 +39,8 @@ export class ChecklistView extends ItemView {
 	private deps: ViewDeps;
 	/** Incremented on every render; async fills bail out when stale. */
 	private renderSeq = 0;
+	private companionHost: HTMLElement | null = null;
+	private companionContext: CompanionContext | null = null;
 
 	constructor(leaf: WorkspaceLeaf, deps: ViewDeps) {
 		super(leaf);
@@ -86,7 +93,11 @@ export class ChecklistView extends ItemView {
 		};
 		header.createDiv({ cls: 'habitude-spacer' });
 		const reviewBtn = header.createEl('button', { text: t('checklist.weeklyReview'), cls: 'habitude-review-btn' });
-		reviewBtn.onclick = () => new ReviewModal(this.app, store, weekKeys).open();
+		reviewBtn.onclick = () => new ReviewModal(this.app, store, weekKeys, {
+			showCompanionPrompts: this.deps.getShowCompanionPrompts,
+			onExplore: () => this.deps.onExploreCompanion('review'),
+			onDismiss: this.deps.onHideCompanionPrompts,
+		}).open();
 
 		// Add-habit row
 		const addRow = container.createDiv({ cls: 'habitude-add-row' });
@@ -122,7 +133,8 @@ export class ChecklistView extends ItemView {
 		}
 
 		// Grid
-		const table = container.createEl('table', { cls: 'habitude-grid' });
+		const grid = container.createDiv({ cls: 'habitude-grid-wrap' });
+		const table = grid.createEl('table', { cls: 'habitude-grid' });
 		const thead = table.createEl('thead');
 		const headRow = thead.createEl('tr');
 		headRow.createEl('th', { text: '', cls: 'habitude-col-habit' });
@@ -170,7 +182,10 @@ export class ChecklistView extends ItemView {
 				const btn = td.createEl('button', {
 					text: checked ? '✓' : '',
 					cls: 'habitude-toggle' + (checked ? ' habitude-checked' : ''),
-					attr: { 'aria-label': t('checklist.toggleAria', { title: habit.title, date: key }) },
+					attr: {
+						'aria-label': t('checklist.toggleAria', { title: habit.title, date: key }),
+						'aria-pressed': String(checked),
+					},
 				});
 				btn.onclick = () => {
 					void store
@@ -229,13 +244,31 @@ export class ChecklistView extends ItemView {
 			}
 		})();
 
-		// Footer: the only funnel bridge — a plain external link. No API, no token.
+		// Discovery follows local value; no promotion competes with the first habit.
 		const footer = container.createDiv({ cls: 'habitude-footer' });
-		const coachBtn = footer.createEl('button', { text: t('checklist.getCoaching'), cls: 'habitude-coach-btn' });
-		coachBtn.onclick = () => window.open(COACHING_URL, '_blank', 'noopener');
+		this.companionHost = footer.createDiv();
+		this.companionContext = {
+			habitCount: habits.length,
+			weekChecks: weekKeys.reduce((total, key) => total + habits.filter((h) =>
+				weekChecks.get(key)?.has(h.id)).length, 0),
+			coachConfigured: this.deps.getCoachConfigured(),
+		};
+		this.refreshCompanionPrompt();
 		footer.createEl('p', {
 			text: t('checklist.footnote'),
 			cls: 'habitude-footnote',
+		});
+	}
+
+	/** Update discovery alone so preference changes preserve the add-habit draft. */
+	refreshCompanionPrompt(): void {
+		this.companionHost?.empty();
+		if (!this.companionHost || !this.companionContext?.habitCount || !this.deps.getShowCompanionPrompts()) return;
+		renderCompanionCard(this.companionHost, {
+			entryPoint: 'checklist',
+			reason: recommendCompanion(this.companionContext),
+			onExplore: () => this.deps.onExploreCompanion('checklist'),
+			onDismiss: () => { void this.deps.onHideCompanionPrompts(); },
 		});
 	}
 
@@ -269,7 +302,9 @@ export class ChecklistView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
-		// nothing to clean up
+		++this.renderSeq;
+		this.companionHost = null;
+		this.companionContext = null;
 	}
 }
 

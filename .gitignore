@@ -1,4 +1,5 @@
-node_modules/
+node_modules
+.deps-cache/
 main.js
 .DS_Store
 data.json
@@ -7,3 +8,6 @@ test/coach/dist/
 test/settings/dist/
 test/share/dist/
 test/i18n/dist/
+test/companion/dist/
+test-vault/
+test/transfer/dist/

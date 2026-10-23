@@ -39,7 +39,7 @@ export function historyStripSvg(days: GraphDay[], label: string): string {
 		})
 		.join('');
 	return (
-		`<svg class="habitude-graph-svg" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" ` +
+		`<svg xmlns="http://www.w3.org/2000/svg" class="habitude-graph-svg" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" ` +
 		`role="img" aria-label="${escapeXml(label)}"><title>${escapeXml(label)}</title>${rects}</svg>`
 	);
 }
@@ -71,7 +71,7 @@ export function weeklyBarsSvg(weekRates: number[], label: string): string {
 		})
 		.join('');
 	return (
-		`<svg class="habitude-graph-svg" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" ` +
+		`<svg xmlns="http://www.w3.org/2000/svg" class="habitude-graph-svg" viewBox="0 0 ${w} ${h}" width="100%" height="${h}" ` +
 		`role="img" aria-label="${escapeXml(label)}"><title>${escapeXml(label)}</title>${bars}</svg>`
 	);
 }

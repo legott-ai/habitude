@@ -5,12 +5,15 @@ import { Notice, Plugin } from 'obsidian';
 import { t } from './i18n';
 import { DEFAULT_SETTINGS, HabitudeSettingTab, type PluginSettings } from './settings';
 import { normalizeCheckmarkColor } from './types';
-import { DEFAULT_COACH_MODEL } from './coach/providers';
+import { DEFAULT_COACH_MODEL, getProvider } from './coach/providers';
 import { HabitStore } from './store';
 import { CHECKLIST_VIEW_TYPE, ChecklistView } from './ui/checklist-view';
 import { COACH_VIEW_TYPE, CoachView } from './ui/coach-view';
 import { registerCommands } from './commands';
 import { todayKey } from './utils/dates';
+import { normalizeCompanionPrompts, type CompanionEntryPoint } from './companion';
+import { CompanionModal } from './ui/companion-modal';
+import { ExportModal } from './ui/export-modal';
 
 /** Pre-0.4.2 stored keys. Read once for migration, then purged from data.json. */
 interface LegacySettings {
@@ -32,6 +35,11 @@ export default class HabitudePlugin extends Plugin {
 				getWeekStart: () => this.settings.weekStart,
 				getCheckmarkColor: () => this.settings.checkmarkColor,
 				getPluginVersion: () => this.manifest.version,
+				getShowCompanionPrompts: () => this.settings.showCompanionPrompts,
+				getCoachConfigured: () => !getProvider(this.settings.llmProvider).needsKey
+					|| !!this.settings.llmApiKey.trim(),
+				onExploreCompanion: (entryPoint) => this.openCompanion(entryPoint),
+				onHideCompanionPrompts: () => this.hideCompanionPrompts(),
 			}),
 		);
 
@@ -102,6 +110,41 @@ export default class HabitudePlugin extends Plugin {
 		void workspace.revealLeaf(leaf);
 	}
 
+	/** Opening discovery stays local; only an explicit website link leaves Obsidian. */
+	openCompanion(entryPoint: CompanionEntryPoint): void {
+		new CompanionModal(this.app, entryPoint, () => this.openHabitExport()).open();
+	}
+
+	openHabitExport(): void {
+		new ExportModal(this.app, this.settings.dataFolder, this.manifest.version).open();
+	}
+
+	async hideCompanionPrompts(): Promise<void> {
+		await this.setCompanionPrompts(false);
+	}
+
+	async setCompanionPrompts(show: boolean): Promise<void> {
+		const previous = this.settings.showCompanionPrompts;
+		this.settings.showCompanionPrompts = show;
+		try {
+			await this.saveData(this.settings);
+			// Keep unsaved coach input and active conversations intact.
+			for (const type of [CHECKLIST_VIEW_TYPE, COACH_VIEW_TYPE]) {
+				for (const leaf of this.app.workspace.getLeavesOfType(type)) {
+					if (show && (leaf.view instanceof ChecklistView || leaf.view instanceof CoachView)) {
+						leaf.view.refreshCompanionPrompt();
+					} else if (!show) {
+						leaf.view.containerEl.querySelectorAll('.habitude-companion-card')
+							.forEach((card) => card.remove());
+					}
+				}
+			}
+		} catch {
+			this.settings.showCompanionPrompts = previous;
+			new Notice(t('companion.savePreferenceFailed'));
+		}
+	}
+
 	/** Lazily created store bound to the configured data folder. */
 	getStore(): HabitStore {
 		if (!this.store) {
@@ -147,12 +190,13 @@ export default class HabitudePlugin extends Plugin {
 		// Legacy keys (pre-0.4.2) may still sit in stored data; they are read
 		// here, migrated once, and purged below. They no longer exist in
 		// PluginSettings/DEFAULT_SETTINGS.
-		const raw = (await this.loadData()) as Partial<PluginSettings> & LegacySettings;
+		const raw = ((await this.loadData()) ?? {}) as Partial<PluginSettings> & LegacySettings;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
 		// New setting: users without it (pre-checkmark-color versions) inherit
 		// the white default via Object.assign; invalid values are normalized
 		// so the check mark can never render with a broken color.
 		this.settings.checkmarkColor = normalizeCheckmarkColor(this.settings.checkmarkColor);
+		this.settings.showCompanionPrompts = normalizeCompanionPrompts(this.settings.showCompanionPrompts);
 		// One-time migration: legacy geminiApiKey/coachModel → provider-neutral
 		// llm* settings. Only runs when the new key is empty and a legacy key
 		// exists, so existing users keep their coach working after the update.

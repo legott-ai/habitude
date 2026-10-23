@@ -1,0 +1,39 @@
+{
+  "format": "habitude-obsidian-export",
+  "version": 1,
+  "pluginVersion": "0.4.4",
+  "exportedAt": "2026-10-23T12:00:00.000Z",
+  "habits": [
+    {
+      "id": "read",
+      "title": "Read for 10 minutes",
+      "created": "2024-02-29",
+      "schedule": "daily",
+      "archived": false
+    },
+    {
+      "id": "예전-습관",
+      "title": "예전 습관",
+      "created": "2020-01-01",
+      "schedule": "daily",
+      "archived": true
+    }
+  ],
+  "checks": [
+    {
+      "date": "2026-10-22",
+      "habitId": "read",
+      "checked": false
+    },
+    {
+      "date": "2026-10-23",
+      "habitId": "read",
+      "checked": true
+    },
+    {
+      "date": "2026-10-23",
+      "habitId": "예전-습관",
+      "checked": true
+    }
+  ]
+}

@@ -27,9 +27,6 @@ export interface HabitStats {
 	weekRate: number;
 }
 
-/** The funnel bridge: a plain external link. Never an API client. */
-export const COACHING_URL = 'https://habitude.ai';
-
 export interface PluginSettings {
 	/** vault-relative folder that holds Habits.md and Log/ */
 	dataFolder: string;
@@ -47,6 +44,8 @@ export interface PluginSettings {
 	llmBaseUrl: string;
 	/** reply language for the coach */
 	coachLanguage: CoachLanguage;
+	/** Show optional app/plan discovery cards inside Habitude views. No tracking. */
+	showCompanionPrompts: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -58,6 +57,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	llmModel: '',
 	llmBaseUrl: '',
 	coachLanguage: 'auto',
+	showCompanionPrompts: true,
 };
 
 /**

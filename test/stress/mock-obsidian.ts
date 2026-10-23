@@ -9,14 +9,20 @@ export function normalizePath(p: string): string {
 }
 
 export class TFile {
+	public name: string;
 	public stat: { mtime: number; ctime: number; size: number };
 	constructor(
 		public path: string,
 		public basename: string,
 		mtime = 0,
 	) {
+		this.name = path.split('/').pop() ?? '';
 		this.stat = { mtime, ctime: mtime, size: 0 };
 	}
+}
+
+export class TFolder {
+	constructor(public path: string, public children: (TFile | TFolder)[] = []) {}
 }
 
 class MockVault {
@@ -67,8 +73,12 @@ class MockVault {
 		return new TFile(np, path.basename(np, path.extname(np)), mtime);
 	}
 
-	getAbstractFileByPath(p: string): TFile | null {
+	getAbstractFileByPath(p: string): TFile | TFolder | null {
 		const a = this.abs(p);
+		if (fs.existsSync(a) && fs.statSync(a).isDirectory()) {
+			return new TFolder(normalizePath(p), fs.readdirSync(a).map((name) =>
+				this.getAbstractFileByPath(`${p}/${name}`)).filter((file): file is TFile | TFolder => file !== null));
+		}
 		if (fs.existsSync(a) && fs.statSync(a).isFile()) {
 			return this.makeFile(p);
 		}

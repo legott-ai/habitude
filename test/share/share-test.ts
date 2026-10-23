@@ -236,11 +236,13 @@ function testGraphs(): void {
 	}));
 	const strip = historyStripSvg(days, 'Test habit');
 	check('strip is svg', strip.includes('<svg') && strip.includes('</svg>'));
+	check('strip retains SVG namespace when parsed as XML', strip.includes('xmlns="http://www.w3.org/2000/svg"'));
 	check('strip has 30 cells', (strip.match(/<rect/g) ?? []).length === 30);
 	check('strip has no raw script', !strip.includes('<script>'));
 
 	const bars = weeklyBarsSvg([0, 0.5, 1, 0.25, 0.75, 1, 0, 0.5], 'Test habit');
 	check('bars is svg', bars.includes('<svg'));
+	check('bars retain SVG namespace when imported into the view', bars.includes('xmlns="http://www.w3.org/2000/svg"'));
 	check('bars has 8 bars', (bars.match(/<rect/g) ?? []).length === 8);
 	check('bars show % labels', bars.includes('50%') && bars.includes('100%'));
 

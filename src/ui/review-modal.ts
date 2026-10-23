@@ -5,12 +5,20 @@ import { t } from '../i18n';
 import type { Habit } from '../types';
 import { recentKeys, streakFor, weekRateFor } from '../stats';
 import type { HabitStore } from '../store';
+import { renderCompanionCard } from './companion-card';
+
+interface ReviewDiscovery {
+	showCompanionPrompts: () => boolean;
+	onExplore: () => void;
+	onDismiss: () => Promise<void>;
+}
 
 export class ReviewModal extends Modal {
 	constructor(
 		app: import('obsidian').App,
 		private store: HabitStore,
 		private weekKeys: string[],
+		private discovery?: ReviewDiscovery,
 	) {
 		super(app);
 	}
@@ -55,6 +63,20 @@ export class ReviewModal extends Modal {
 			text: t('review.totalChecks', { total: totalChecks }),
 			cls: 'habitude-review-total',
 		});
+		if (totalChecks > 0 && this.discovery?.showCompanionPrompts()) {
+			const discovery = this.discovery;
+			const host = contentEl.createDiv();
+			renderCompanionCard(host, {
+				entryPoint: 'review',
+				reason: 'review',
+				onExplore: discovery.onExplore,
+				onDismiss: () => {
+					void discovery.onDismiss().then(() => {
+						if (!discovery.showCompanionPrompts()) host.empty();
+					});
+				},
+			});
+		}
 	}
 
 	onClose(): void {
