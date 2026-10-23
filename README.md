@@ -46,7 +46,7 @@ Both files are human-readable and hand-editable. The plugin re-reads them on eve
 
 **The plugin remains free and works without a Habitude account or subscription.** Local checklists, graphs, reviews, Markdown access, and BYOK coaching are independent of Habitude's planned subscriptions. Your selected AI provider can charge separately for BYOK usage.
 
-The local overview previews the approved launch plans below. **Sync and Plus are planned, not on sale through this plugin.** There is no Habitude sign-in, checkout, paid entitlement, or automatic Obsidian-to-Habitude sync. This development build adds a local JSON export for the companion app’s manual importer; public app availability is separate. See the [manual transfer guide](docs/obsidian-transfer.md).
+The local overview previews the approved launch plans below. **Sync and Plus are planned and are not on sale.** The plugin has no Habitude sign-in, checkout, paid entitlement, or automatic Obsidian-to-Habitude sync. Version 0.5.0 adds a local JSON export for Habitude's manual importer. See the [manual transfer guide](docs/obsidian-transfer.md) for the supported format and separate app flow.
 
 | Plan | Monthly USD | Annual USD total | Planned service allocation |
 | --- | ---: | ---: | --- |
@@ -56,7 +56,7 @@ The local overview previews the approved launch plans below. **Sync and Plus are
 
 200 weighted credits does not mean 200 messages. Supported sources, credit costs, taxes, refunds, and final billing conditions must be disclosed before sale. Cloud storage limits do not limit your local vault. App cloud sync does not mean the Obsidian plugin can sync with the app.
 
-**Development status, checked October 23, 2026:** the public website currently shows an earlier Premium offer that differs from these launch plans. The overview discloses this mismatch. Align public pricing and actual feature availability before distributing this change. This work does not launch billing or update the public website. See the [product and conversion plan (Korean)](docs/product-and-conversion-plan.ko.md) for the app journey, import, checkout, entitlement, cancellation, and release requirements.
+**Service status:** local habit export and manual import are separate from the planned paid services. Public web access does not activate a subscription, cloud sync, or managed AI. Sync and Plus require further service and billing work before sale. See the [product and conversion plan (Korean)](docs/product-and-conversion-plan.ko.md) for the app journey, import, checkout, entitlement, cancellation, and release requirements.
 
 ## Local habit export
 

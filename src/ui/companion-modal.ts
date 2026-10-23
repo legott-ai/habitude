@@ -93,7 +93,7 @@ export class CompanionModal extends Modal {
 		privacy.createEl('h3', { text: t('companion.privacy.title') });
 		privacy.createEl('p', { text: t('companion.privacy.data') });
 		privacy.createEl('p', { text: t('companion.privacy.website') });
-		privacy.createEl('p', { text: t('companion.privacy.legacyOffer') });
+		privacy.createEl('p', { text: t('companion.privacy.serviceStatus') });
 		if (this.onExport) {
 			const transfer = this.contentEl.createDiv({ cls: 'habitude-companion-current' });
 			transfer.createEl('h3', { text: t('transfer.title') });

@@ -4,7 +4,7 @@
 
 이 문서는 기존 플러그인 코드와 2026-10-15 수익화 정본을 바탕으로 한 제품 명세다. **플러그인은 독립적으로 쓸 수 있는 무료 로컬 제품으로 유지하고, 앱·웹은 기록을 더 넓게 활용하려는 사람이 직접 선택하게 한다.** 유입을 늘리기 위해 기본 기록을 제한하거나 노트를 자동 전송하지 않는다.
 
-정책의 정본은 [수익화 정책과 검증 계획](</Users/matthewchang/workspace/habitude-codex/heavytude/plans/monetization-2026-10-15.md>)이다. 이 문서가 승인된 가격·포함량을 변경하지 않는다. 서비스 출시, 결제 제공자 연결, 실판매, 배포, 클라우드 업로드는 이 문서 작성이나 로컬 플러그인 개선만으로 실행되지 않는다.
+정책의 정본은 앱 저장소의 수익화 정책과 검증 계획(`plans/monetization-2026-10-15.md`)이다. 이 문서가 승인된 가격·포함량을 변경하지 않는다. 서비스 출시, 결제 제공자 연결, 실판매, 배포, 클라우드 업로드는 이 문서 작성이나 로컬 플러그인 개선만으로 실행되지 않는다.
 
 ## 1. 목표와 설계 원칙
 
@@ -404,7 +404,7 @@ Habitude 앱 간 Sync 출시와 Obsidian 플러그인 연결은 별도 gate다. 
 
 기존 bilingual 웹 소스를 승인된 Free/Sync/Plus·미출시 상태·공통 웹/iPhone/iPad 개발 현황에 맞췄다. 수동 이전 안내와 허용된 고정 유입 파라미터를 추가했다. 로컬 backend archive의 homepage 두 파일만 백업 후 적용했으며, manifest의 전체 23개 파일이 소스 hash와 일치한다. 공개 habitude.ai는 변경하지 않았으므로 이전 요금제 경고와 공개 배포 차단은 유지한다.
 
-결제 서버 코어는 신뢰한 서버 인증, 고정 SKU, 영속 작업 원장 계약, 중복 checkout 방지, 응답 유실 복구, 원본 webhook/서명 adapter 경계, 최신 구독 조회, 오래된 응답의 덮어쓰기 방지를 구현했다. readiness gate는 모두 false다. 실제 공급자 SDK·sandbox·배포·사용량 예약/정산·기존 sync/AI 권한 연결은 없다. 순수 quota 판정 테스트를 실제 서비스 한도 집행으로 표현하지 않는다. [앱 구현·검증 기록](</Users/matthewchang/workspace/habitude-codex/heavytude-obsidian-conversion/plans/obsidian-conversion-2026-10-23.md>)과 [결제 서버 범위](</Users/matthewchang/workspace/habitude-codex/heavytude-obsidian-conversion/commerce/README.md>)를 따른다.
+결제 서버 코어는 신뢰한 서버 인증, 고정 SKU, 영속 작업 원장 계약, 중복 checkout 방지, 응답 유실 복구, 원본 webhook/서명 adapter 경계, 최신 구독 조회, 오래된 응답의 덮어쓰기 방지를 구현했다. readiness gate는 모두 false다. 실제 공급자 SDK·sandbox·배포·사용량 예약/정산·기존 sync/AI 권한 연결은 없다. 순수 quota 판정 테스트를 실제 서비스 한도 집행으로 표현하지 않는다. 앱 저장소의 구현·검증 기록(`plans/obsidian-conversion-2026-10-23.md`)과 결제 서버 범위(`commerce/README.md`)를 따른다.
 
 | 검증 | 직접 확인한 결과 |
 |---|---|
@@ -418,3 +418,10 @@ Habitude 앱 간 Sync 출시와 Obsidian 플러그인 연결은 별도 gate다. 
 최종 exporter의 Obsidian 실앱 화면 검증은 미완료다. 합성 볼트를 reload한 뒤 앱 창이 빈 화면에 머물렀고 명령·개발 도구·정상 재시작 조작에도 반응하지 않아 저장 버튼까지 검증하지 못했다. exporter 자동 검증 및 앞선 companion 실앱 QA를 이 증거로 대체하지 않는다. 실제 iOS/Android 파일 선택도 미검증이다.
 
 기존 Next 전체 앱 빌드는 안전한 archive에 `src/lib/env-config.ts`와 설치된 의존성이 없어 실행하지 않았다. 제외된 설정·키를 복원하지 않는다. 안전한 구성과 전체 빌드, 실제 공급자 sandbox, 영속 queue·삭제 fence·usage 집행·운영/정책 검증을 끝낸 뒤 기존 Production/실판매 개별 승인 조건을 적용한다. push·release·공개 배포·실제 청구는 이번 작업에 포함하지 않았다.
+
+
+## 18. 0.5.0 공개 배포 준비
+
+후속 직접 배포 요청으로 0.5.0 metadata·릴리스 노트를 준비했다. 새 비클라우드 합성 볼트에서 실제 Obsidian 1.13.7의 명령→미리보기→JSON 저장을 확인했다. 습관 3개·상태 13개·pluginVersion 0.5.0의 결과를 읽어 확인하고 원본 registry와 전체 로그의 bytes가 그대로임을 검사했다. 앞선 빈 창 문제를 현재 exporter 실패로 확대하지 않는다. 서비스 안내는 과거 웹 가격 불일치라는 시점 의존 문구 대신 미판매·수동 이전의 경계를 설명하도록 바꿨다.
+
+GitHub Actions의 tag build·provenance attestation·draft release 생성이 끝난 뒤 에셋 세 개를 검증하고 발행한다. 웹과 앱은 기존 로그인·API·공유 라우트를 보존한 별도 Hosting 배포로 검증한다. 실판매 서버의 provider·권한·사용량 집행이 준비되지 않았으므로 Sync/Plus 판매는 계속 비활성이다. 이 절은 배포 준비 기록이며 실제 URL/version 검증 결과는 배포 후 별도 기록한다.
