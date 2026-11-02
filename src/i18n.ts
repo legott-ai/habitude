@@ -6,6 +6,8 @@
 // The locale is detected from Obsidian's own UI language setting; there is
 // no per-plugin language switch.
 
+import { getLanguage } from 'obsidian';
+
 export type UiLocale = 'en' | 'ko';
 
 type Dict = Record<string, string>;
@@ -449,23 +451,14 @@ export function clearUiLocale(): void {
 
 /**
  * Detect the UI locale from Obsidian's own language setting via the
- * getLanguage() API. Never throws: the API may be absent (node tests)
- * or access-restricted. Uses window for popout window compatibility
- * per the community review guidelines.
+ * exported getLanguage() API, which also works in popout windows.
+ * An unavailable or failing API falls back to English.
  */
 export function getUiLocale(): UiLocale {
 	if (override) return override;
 	try {
-		// getLanguage() is exposed on window by the Obsidian runtime.
-		const w =
-			typeof window === 'undefined'
-				? undefined
-				: (window as unknown as { getLanguage?: unknown });
-		const getLang = w?.getLanguage;
-		if (typeof getLang === 'function') {
-			const lang = (getLang as () => string)();
-			if (lang && lang.toLowerCase().startsWith('ko')) return 'ko';
-		}
+		const lang = getLanguage();
+		if (typeof lang === 'string' && lang.toLowerCase().startsWith('ko')) return 'ko';
 	} catch {
 		// Absent or unreadable — fall through to English.
 	}

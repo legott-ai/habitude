@@ -4,6 +4,16 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+let languageReader: () => unknown = () => 'en';
+
+export function setMockLanguageReader(reader: () => unknown): void {
+	languageReader = reader;
+}
+
+export function getLanguage(): string {
+	return languageReader() as string;
+}
+
 export function normalizePath(p: string): string {
 	return p.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\.\//, '');
 }
