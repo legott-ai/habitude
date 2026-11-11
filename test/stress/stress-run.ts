@@ -313,6 +313,18 @@ async function scenarioEmptyVault(): Promise<void> {
 	const checks = await store.loadDayChecks(todayKey());
 	check('loadDayChecks on missing file → empty set', checks.size === 0);
 
+	// Multi-segment nested folder + concurrent cross-store registry mutations
+	const nestedStoreA = new HabitStore(app, 'Nested/Folder/Habitude');
+	const nestedStoreB = new HabitStore(app, 'Nested/Folder/Habitude');
+	await Promise.all([
+		nestedStoreA.addHabit('Walk'),
+		nestedStoreB.addHabit('Read'),
+		nestedStoreA.addHabit('Meditate'),
+		nestedStoreB.addHabit('Walk'),
+	]);
+	const nestedHabits = await nestedStoreA.loadHabits();
+	check('nested multi-segment concurrent addHabit preserves all 4', nestedHabits.length === 4);
+
 	fs.rmSync(vaultDir, { recursive: true, force: true });
 }
 

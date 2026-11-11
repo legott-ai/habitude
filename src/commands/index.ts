@@ -3,46 +3,23 @@
 import { Notice, SuggestModal } from 'obsidian';
 import { t } from '../i18n';
 import type HabitudePlugin from '../main';
-import { CHECKLIST_VIEW_TYPE } from '../ui/checklist-view';
-import { COACH_VIEW_TYPE } from '../ui/coach-view';
 import { ReviewModal } from '../ui/review-modal';
 import { addDays, startOfWeek, todayKey } from '../utils/dates';
-
-async function openChecklist(plugin: HabitudePlugin): Promise<void> {
-	const { workspace } = plugin.app;
-	const existing = workspace.getLeavesOfType(CHECKLIST_VIEW_TYPE)[0];
-	if (existing) {
-		void workspace.revealLeaf(existing);
-		return;
-	}
-	const leaf = workspace.getRightLeaf(false);
-	if (!leaf) {
-		new Notice(t('notice.cannotOpenChecklist'));
-		return;
-	}
-	await leaf.setViewState({ type: CHECKLIST_VIEW_TYPE, active: true });
-	void workspace.revealLeaf(leaf);
-}
-
-async function openCoach(plugin: HabitudePlugin): Promise<void> {
-	const { workspace } = plugin.app;
-	const existing = workspace.getLeavesOfType(COACH_VIEW_TYPE)[0];
-	if (existing) {
-		void workspace.revealLeaf(existing);
-		return;
-	}
-	const leaf = workspace.getRightLeaf(false);
-	if (!leaf) {
-		new Notice(t('notice.cannotOpenCoach'));
-		return;
-	}
-	await leaf.setViewState({ type: COACH_VIEW_TYPE, active: true });
-	void workspace.revealLeaf(leaf);
-}
 
 interface HabitChoice {
 	id: string;
 	title: string;
+}
+
+interface StatusBarRefreshable {
+	updateStatusBar?: () => Promise<void>;
+}
+
+function refreshStatusBar(plugin: HabitudePlugin): void {
+	const candidate = plugin as unknown as StatusBarRefreshable;
+	if (typeof candidate.updateStatusBar === 'function') {
+		void candidate.updateStatusBar();
+	}
 }
 
 class HabitSuggestModal extends SuggestModal<HabitChoice> {
@@ -85,13 +62,13 @@ export function registerCommands(plugin: HabitudePlugin): void {
 	plugin.addCommand({
 		id: 'open-checklist',
 		name: t('cmd.openChecklist'),
-		callback: () => void openChecklist(plugin),
+		callback: () => void plugin.activateView(),
 	});
 
 	plugin.addCommand({
 		id: 'open-coach',
 		name: t('cmd.openCoach'),
-		callback: () => void openCoach(plugin),
+		callback: () => void plugin.activateCoachView(),
 	});
 
 	plugin.addCommand({
@@ -124,15 +101,21 @@ export function registerCommands(plugin: HabitudePlugin): void {
 					plugin.app,
 					(h) => {
 						void (async () => {
-							const checks = await store.loadDayChecks(todayKey());
-							const checked = checks.has(h.id);
-							await store.setCheck(todayKey(), h.id, h.title, !checked);
-							new Notice(
-								checked
-									? t('cmd.toggledUnchecked', { title: h.title })
-									: t('cmd.toggledChecked', { title: h.title }),
-							);
-							plugin.refreshViews();
+							try {
+								const today = todayKey();
+								const checks = await store.loadDayChecks(today);
+								const checked = checks.has(h.id);
+								await store.setCheck(today, h.id, h.title, !checked);
+								new Notice(
+									checked
+										? t('cmd.toggledUnchecked', { title: h.title })
+										: t('cmd.toggledChecked', { title: h.title }),
+								);
+								plugin.refreshViews();
+								refreshStatusBar(plugin);
+							} catch {
+								new Notice(t('checklist.saveCheckFailed'));
+							}
 						})();
 					},
 					habits.map((h) => ({ id: h.id, title: h.title })),

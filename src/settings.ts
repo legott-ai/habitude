@@ -4,16 +4,35 @@
 // device's plugin data and is sent only to the selected provider — never
 // to Habitude servers.
 
-import { App, PluginSettingTab, TextComponent } from 'obsidian';
+import { App, Notice, PluginSettingTab, TextComponent } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
 import { t } from './i18n';
 import type HabitudePlugin from './main';
-import { getProvider, LLM_PROVIDER_IDS, type LlmProviderId } from './coach/providers';
-import { DEFAULT_SETTINGS, normalizeCheckmarkColor, type PluginSettings } from './types';
+import { getProvider, LLM_PROVIDER_IDS } from './coach/providers';
+import {
+	DEFAULT_SETTINGS,
+	isValidBaseUrl,
+	isValidLlmModel,
+	isValidVaultFolder,
+	normalizeCheckmarkColor,
+	normalizeCoachLanguage,
+	normalizeLlmApiKey,
+	normalizeLlmBaseUrl,
+	normalizeLlmModel,
+	normalizeLlmProvider,
+	normalizeVaultFolder,
+	normalizeWeekStart,
+	type PluginSettings,
+} from './types';
 import { normalizeCompanionPrompts } from './companion';
 
 export type { PluginSettings };
 export { DEFAULT_SETTINGS };
+
+function translateOrFallback(primaryKey: string, fallbackKey: string): string {
+	const resolved = t(primaryKey);
+	return resolved === primaryKey ? t(fallbackKey) : resolved;
+}
 
 export class HabitudeSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: HabitudePlugin) {
@@ -165,27 +184,40 @@ export class HabitudeSettingTab extends PluginSettingTab {
 			return;
 		}
 		if (key === 'weekStart') {
-			this.plugin.settings.weekStart = value === '0' ? 0 : 1;
+			this.plugin.settings.weekStart = normalizeWeekStart(
+				value === '0' ? 0 : value === '1' ? 1 : value,
+			);
 		} else if (key === 'checkmarkColor') {
 			this.plugin.settings.checkmarkColor = normalizeCheckmarkColor(value);
 		} else if (key === 'dataFolder') {
-			const raw = typeof value === 'string' ? value : '';
-			this.plugin.settings.dataFolder = raw.trim() || 'Habitude';
+			const raw = typeof value === 'string' ? value.trim() : '';
+			if (raw === '') {
+				this.plugin.settings.dataFolder = DEFAULT_SETTINGS.dataFolder;
+			} else if (!isValidVaultFolder(raw)) {
+				new Notice(translateOrFallback('settings.dataFolder.invalid', 'transfer.error.folder'));
+				return;
+			} else {
+				this.plugin.settings.dataFolder = normalizeVaultFolder(raw);
+			}
 		} else if (key === 'llmProvider') {
-			const id = typeof value === 'string' ? value : 'gemini';
-			this.plugin.settings.llmProvider = (
-				LLM_PROVIDER_IDS as string[]
-			).includes(id)
-				? (id as LlmProviderId)
-				: 'gemini';
+			this.plugin.settings.llmProvider = normalizeLlmProvider(value);
 		} else if (key === 'llmApiKey') {
-			this.plugin.settings.llmApiKey = typeof value === 'string' ? value.trim() : '';
+			this.plugin.settings.llmApiKey = normalizeLlmApiKey(value);
 		} else if (key === 'llmModel') {
-			this.plugin.settings.llmModel = typeof value === 'string' ? value.trim() : '';
+			if (typeof value === 'string' && value.trim() !== '' && !isValidLlmModel(value)) {
+				new Notice(translateOrFallback('settings.llmModel.invalid', 'coach.error.modelRequired'));
+				return;
+			}
+			this.plugin.settings.llmModel = normalizeLlmModel(value);
 		} else if (key === 'llmBaseUrl') {
-			this.plugin.settings.llmBaseUrl = typeof value === 'string' ? value.trim() : '';
+			const raw = typeof value === 'string' ? value.trim() : '';
+			if (raw !== '' && !isValidBaseUrl(raw)) {
+				new Notice(translateOrFallback('coach.error.baseUrlInvalid', 'coach.error.baseUrlRequired'));
+				return;
+			}
+			this.plugin.settings.llmBaseUrl = normalizeLlmBaseUrl(value);
 		} else if (key === 'coachLanguage') {
-			this.plugin.settings.coachLanguage = value === 'ko' ? 'ko' : value === 'en' ? 'en' : 'auto';
+			this.plugin.settings.coachLanguage = normalizeCoachLanguage(value);
 		}
 		await this.plugin.saveSettings();
 	}
@@ -206,7 +238,7 @@ export class HabitudeSettingTab extends PluginSettingTab {
 					: t('settings.llmKey.emptyPlaceholder'),
 			)
 			.onChange(async (value) => {
-				this.plugin.settings.llmApiKey = value.trim();
+				this.plugin.settings.llmApiKey = normalizeLlmApiKey(value);
 				await this.plugin.saveSettings();
 			});
 	}

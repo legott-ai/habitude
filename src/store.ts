@@ -7,9 +7,10 @@
 // Both files are plain markdown: users can read and edit them by hand and the
 // plugin will pick the changes up on the next render.
 
-import { App, TFile, normalizePath } from 'obsidian';
+import { App, TFile, TFolder, normalizePath } from 'obsidian';
 import type { Habit } from './types';
 import { slugify, todayKey } from './utils/dates';
+import { withVaultWriteLock } from './utils/vault-write-lock';
 
 const HABITS_FILE = 'Habits.md';
 const LOG_FOLDER = 'Log';
@@ -72,13 +73,6 @@ export class HabitStore {
 	constructor(private app: App, private dataFolder: string) {}
 
 	/**
-	 * Per-file write serialization. setCheck/addHabit/archiveHabit all do
-	 * read-modify-write; without a lock, concurrent toggles on the same file
-	 * interleave reads and later writes clobber earlier ones (lost updates).
-	 */
-	private writeLocks = new Map<string, Promise<void>>();
-
-	/**
 	 * Per-day check cache keyed by file mtime. A toggle re-renders the whole
 	 * view; without this, every render re-reads ~67 log files through the
 	 * vault API. External (hand) edits bump mtime and invalidate correctly.
@@ -92,39 +86,60 @@ export class HabitStore {
 	}
 
 	private async withWriteLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-		const prev = this.writeLocks.get(key) ?? Promise.resolve();
-		let release!: () => void;
-		const next = new Promise<void>((resolve) => {
-			release = resolve;
-		});
-		this.writeLocks.set(key, prev.then(() => next));
-		await prev;
-		try {
-			return await fn();
-		} finally {
-			release();
-			if (this.writeLocks.get(key) === next) this.writeLocks.delete(key);
-		}
+		return withVaultWriteLock(this.app.vault, key, fn);
+	}
+
+	private habitsPath(): string {
+		return normalizePath(`${this.dataFolder}/${HABITS_FILE}`);
 	}
 
 	async ensureReady(): Promise<void> {
 		await this.ensureFolder(this.dataFolder);
 		await this.ensureFolder(`${this.dataFolder}/${LOG_FOLDER}`);
-		const path = normalizePath(`${this.dataFolder}/${HABITS_FILE}`);
-		if (!asFile(this.app.vault.getAbstractFileByPath(path))) {
-			await this.app.vault.create(path, '# Habits\n');
-		}
+		const path = this.habitsPath();
+		await this.withWriteLock(path, async () => {
+			if (!asFile(this.app.vault.getAbstractFileByPath(path))) {
+				try {
+					await this.app.vault.create(path, '# Habits\n');
+				} catch (e) {
+					if (!asFile(this.app.vault.getAbstractFileByPath(path))) {
+						throw e;
+					}
+				}
+			}
+		});
 	}
 
+	/**
+	 * Create nested vault folders segment-by-segment ("a", "a/b", "a/b/c")
+	 * iteratively and idempotently under per-segment write locks.
+	 */
 	private async ensureFolder(path: string): Promise<void> {
-		if (!this.app.vault.getAbstractFileByPath(normalizePath(path))) {
-			await this.app.vault.createFolder(normalizePath(path));
+		const normalized = normalizePath(path);
+		const segments = normalized.split('/').filter(Boolean);
+		let current = '';
+		for (const segment of segments) {
+			current = current ? `${current}/${segment}` : segment;
+			const step = current;
+			await this.withWriteLock(step, async () => {
+				const existing = this.app.vault.getAbstractFileByPath(step);
+				if (existing instanceof TFolder) return;
+				if (existing) {
+					throw new Error(`Expected folder at "${step}", found file.`);
+				}
+				try {
+					await this.app.vault.createFolder(step);
+				} catch (e) {
+					if (!(this.app.vault.getAbstractFileByPath(step) instanceof TFolder)) {
+						throw e;
+					}
+				}
+			});
 		}
 	}
 
-	private async loadAllHabitsRaw(): Promise<Habit[]> {
-		await this.ensureReady();
-		const path = normalizePath(`${this.dataFolder}/${HABITS_FILE}`);
+	private async loadAllHabitsUnlocked(): Promise<Habit[]> {
+		const path = this.habitsPath();
 		const file = asFile(this.app.vault.getAbstractFileByPath(path));
 		if (!file) return [];
 		return parseHabits(await this.app.vault.read(file));
@@ -132,45 +147,59 @@ export class HabitStore {
 
 	/** Active (non-archived) habits, oldest first. */
 	async loadHabits(): Promise<Habit[]> {
-		return (await this.loadAllHabitsRaw()).filter((h) => !h.archived);
+		await this.ensureReady();
+		const all = await this.withWriteLock(this.habitsPath(), () => this.loadAllHabitsUnlocked());
+		return all.filter((h) => !h.archived);
 	}
 
 	async addHabit(title: string): Promise<Habit> {
-		const all = await this.loadAllHabitsRaw();
-		const base = slugify(title);
-		let id = base;
-		let n = 2;
-		while (all.some((h) => h.id === id)) {
-			id = `${base}-${n++}`;
-		}
-		const habit: Habit = {
-			id,
-			title: title.trim(),
-			created: todayKey(),
-			schedule: 'daily',
-			archived: false,
-		};
-		all.push(habit);
-		await this.saveAllHabits(all);
-		return habit;
+		await this.ensureReady();
+		// Serialize the complete read-modify-write (including slug allocation)
+		// across all stores sharing this vault so rapid concurrent taps never
+		// lose habits or collide on ids.
+		return this.withWriteLock(this.habitsPath(), async () => {
+			const all = await this.loadAllHabitsUnlocked();
+			const base = slugify(title);
+			let id = base;
+			let n = 2;
+			while (all.some((h) => h.id === id)) {
+				id = `${base}-${n++}`;
+			}
+			const habit: Habit = {
+				id,
+				title: title.trim(),
+				created: todayKey(),
+				schedule: 'daily',
+				archived: false,
+			};
+			all.push(habit);
+			await this.saveAllHabitsUnlocked(all);
+			return habit;
+		});
 	}
 
 	async archiveHabit(id: string): Promise<void> {
-		const all = await this.loadAllHabitsRaw();
-		const habit = all.find((h) => h.id === id);
-		if (habit) {
-			habit.archived = true;
-			await this.saveAllHabits(all);
-		}
+		await this.ensureReady();
+		await this.withWriteLock(this.habitsPath(), async () => {
+			const all = await this.loadAllHabitsUnlocked();
+			const habit = all.find((h) => h.id === id);
+			if (habit && !habit.archived) {
+				habit.archived = true;
+				await this.saveAllHabitsUnlocked(all);
+			}
+		});
 	}
 
-	private async saveAllHabits(habits: Habit[]): Promise<void> {
-		const path = normalizePath(`${this.dataFolder}/${HABITS_FILE}`);
-		await this.withWriteLock(path, async () => {
-			const file = asFile(this.app.vault.getAbstractFileByPath(path));
-			if (!file) return;
-			await this.app.vault.modify(file, renderHabits(habits));
-		});
+	/** Caller owns the registry write lock; reacquiring it here would deadlock. */
+	private async saveAllHabitsUnlocked(habits: Habit[]): Promise<void> {
+		const path = this.habitsPath();
+		const content = renderHabits(habits);
+		const file = asFile(this.app.vault.getAbstractFileByPath(path));
+		if (file) {
+			await this.app.vault.modify(file, content);
+		} else {
+			await this.app.vault.create(path, content);
+		}
 	}
 
 	private logPath(dateKey: string): string {

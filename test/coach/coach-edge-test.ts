@@ -27,6 +27,7 @@ import { addDays, todayKey } from '../../src/utils/dates';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 let failures = 0;
 
@@ -279,6 +280,89 @@ async function testConversationMemory(): Promise<void> {
 	);
 }
 
+async function testRegistryConcurrencyAndFolders(): Promise<void> {
+	console.log('\n[E7] concurrent empty-vault starter-chip taps + multi-segment folders');
+	const vaultDir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-coach-concurrency-'));
+	try {
+		const app = createTestApp(vaultDir);
+		const createdFolders: string[] = [];
+		const origCreateFolder = app.vault.createFolder.bind(app.vault);
+		const origCreate = app.vault.create.bind(app.vault);
+		const origRead = app.vault.read.bind(app.vault);
+
+		// Enforce real Obsidian vault invariants:
+		// 1. createFolder fails if parent segment does not exist OR target already exists.
+		// 2. create fails with "File already exists" if target already exists.
+		// 3. read yields microtasks/timers so unlocked read-modify-write would clobber.
+		app.vault.createFolder = async (folderPath: string) => {
+			await delay(2);
+			const normalized = folderPath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+			const idx = normalized.lastIndexOf('/');
+			if (idx > 0) {
+				const parent = normalized.slice(0, idx);
+				if (!fs.existsSync(path.join(vaultDir, parent))) {
+					throw new Error(`Parent folder does not exist: ${parent}`);
+				}
+			}
+			const full = path.join(vaultDir, normalized);
+			if (fs.existsSync(full)) {
+				throw new Error(`Folder already exists: ${normalized}`);
+			}
+			createdFolders.push(normalized);
+			return origCreateFolder(normalized);
+		};
+		app.vault.create = async (filePath: string, data: string) => {
+			await delay(2);
+			const full = path.join(vaultDir, filePath);
+			if (fs.existsSync(full)) {
+				throw new Error(`File already exists: ${filePath}`);
+			}
+			return origCreate(filePath, data);
+		};
+		app.vault.read = async (file) => {
+			const content = await origRead(file);
+			await delay(3);
+			return content;
+		};
+
+		const storeA = new HabitStore(app, 'Areas/Personal/Habitude');
+		const storeB = new HabitStore(app, 'Areas/Personal/Habitude');
+		const starters = ['Walk', 'Read', 'Exercise', 'Meditate', 'Walk', 'Drink water'];
+		const results = await Promise.all(
+			starters.map((title, idx) => (idx % 2 === 0 ? storeA.addHabit(title) : storeB.addHabit(title))),
+		);
+
+		check(
+			'multi-segment folders created iteratively parent-first',
+			createdFolders.join(',') ===
+				'Areas,Areas/Personal,Areas/Personal/Habitude,Areas/Personal/Habitude/Log',
+			` (${createdFolders.join(',')})`,
+		);
+		const loaded = await storeA.loadHabits();
+		check('all 6 concurrent habits preserved (no lost writes)', loaded.length === 6, ` (got ${loaded.length})`);
+		check('duplicate starter slugs disambiguated cleanly', new Set(results.map((h) => h.id)).size === 6);
+
+		// Concurrent archive + add + setCheck across both stores.
+		const today = todayKey();
+		const toArchive = results[0];
+		if (toArchive) {
+			await Promise.all([
+				storeA.archiveHabit(toArchive.id),
+				storeB.addHabit('Sleep early'),
+				...results.slice(1).map((h, idx) =>
+					(idx % 2 === 0 ? storeA : storeB).setCheck(today, h.id, h.title, true),
+				),
+			]);
+		}
+		const afterArchive = await storeB.loadHabits();
+		check('concurrent archive + add leaves 6 active habits', afterArchive.length === 6, ` (got ${afterArchive.length})`);
+		const dayChecks = await storeA.loadDayChecks(today);
+		check('all 5 concurrent checks persisted across shared vault lock', dayChecks.size === 5, ` (got ${dayChecks.size})`);
+	} finally {
+		fs.rmSync(vaultDir, { recursive: true, force: true });
+	}
+}
+
 async function main(): Promise<void> {
 	await testEmptyVault();
 	await testSpecialTitles();
@@ -286,6 +370,7 @@ async function main(): Promise<void> {
 	await testMalformedLogs();
 	await testErrorShapes();
 	await testConversationMemory();
+	await testRegistryConcurrencyAndFolders();
 	console.log(failures === 0 ? '\nALL COACH EDGE TESTS PASSED' : `\n${failures} FAILURES`);
 	process.exit(failures === 0 ? 0 : 1);
 }

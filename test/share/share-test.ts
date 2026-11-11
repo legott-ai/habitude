@@ -215,12 +215,19 @@ async function testShareFromStore(): Promise<void> {
 	const loadHabits = async () => [habit];
 	const loadChecksRange = async () => checksFor('read-20-pages', [0]);
 
-	// failure path: backend not there yet
+	// failure path: backend not there yet (also verifies Node CLI runs without window global)
+	const hadWindow = 'window' in globalThis;
+	const prevWindow = (globalThis as Record<string, unknown>).window;
+	delete (globalThis as Record<string, unknown>).window;
 	const notices: string[] = [];
 	const copies: string[] = [];
-	await shareFromStore(loadHabits, loadChecksRange, '0.3.0', (m) => notices.push(m), async (t) => {
-		copies.push(t);
-	});
+	try {
+		await shareFromStore(loadHabits, loadChecksRange, '0.3.0', (m) => notices.push(m), async (t) => {
+			copies.push(t);
+		});
+	} finally {
+		if (hadWindow) (globalThis as Record<string, unknown>).window = prevWindow;
+	}
 	// defaultPost hits the real network in the plugin; in tests the sandbox
 	// has no share backend, so this must resolve to the ready notice
 	// (localized for the test env's UI locale, which is English in node).

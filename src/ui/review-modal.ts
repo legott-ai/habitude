@@ -7,6 +7,9 @@ import { recentKeys, streakFor, weekRateFor } from '../stats';
 import type { HabitStore } from '../store';
 import { renderCompanionCard } from './companion-card';
 
+/** Matches the companion review check threshold without coupling to WIP exports. */
+const MIN_REVIEW_CHECKS_FOR_COMPANION = 3;
+
 interface ReviewDiscovery {
 	showCompanionPrompts: () => boolean;
 	onExplore: () => void;
@@ -63,7 +66,7 @@ export class ReviewModal extends Modal {
 			text: t('review.totalChecks', { total: totalChecks }),
 			cls: 'habitude-review-total',
 		});
-		if (totalChecks > 0 && this.discovery?.showCompanionPrompts()) {
+		if (totalChecks >= MIN_REVIEW_CHECKS_FOR_COMPANION && this.discovery?.showCompanionPrompts()) {
 			const discovery = this.discovery;
 			const host = contentEl.createDiv();
 			renderCompanionCard(host, {
