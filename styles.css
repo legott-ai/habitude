@@ -8,6 +8,7 @@
 	gap: 12px;
 	height: 100%;
 	overflow-y: auto;
+	container-type: inline-size;
 }
 
 .habitude-header {
@@ -15,6 +16,11 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
+}
+
+/* Pushes the weekly review to the far edge of the header. */
+.habitude-spacer {
+	flex: 1;
 }
 
 .habitude-week-label {
@@ -63,7 +69,103 @@
 }
 
 .habitude-empty {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-secondary);
+}
+
+.habitude-empty-title {
+	font-size: 1.05em;
+}
+
+.habitude-empty-hint {
+	margin: 0;
 	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	line-height: 1.5;
+}
+
+.habitude-starters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 4px;
+}
+
+.habitude-starter {
+	cursor: pointer;
+	min-height: 32px;
+	padding: 4px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	box-shadow: none;
+}
+
+.habitude-starter:hover:not(:disabled) {
+	border-color: var(--interactive-accent);
+}
+
+.habitude-starter:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}
+
+/* Today: the day's count and the next habit, one tap to check it. */
+.habitude-today-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-secondary);
+}
+
+.habitude-today-count {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.habitude-today-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.habitude-today-ask {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.habitude-today-done {
+	cursor: pointer;
+	flex-shrink: 0;
+	min-height: 32px;
+	padding: 4px 14px;
+	border: none;
+	border-radius: 6px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: 600;
+}
+
+.habitude-today-done:disabled {
+	opacity: 0.6;
+	cursor: wait;
+}
+
+.habitude-empty :is(button):focus-visible,
+.habitude-today-card button:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
 }
 
 .habitude-grid-wrap {
@@ -173,49 +275,10 @@
 	gap: 6px;
 }
 
-.habitude-coach-btn {
-	cursor: pointer;
-	padding: 10px;
-	border: none;
-	border-radius: 8px;
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-	font-weight: 700;
-	font-size: 1em;
-}
-
 .habitude-footnote {
 	font-size: 0.78em;
 	color: var(--text-muted);
 	margin: 0;
-}
-
-/* Connect modal (Stage 1) */
-.habitude-connect-modal ul {
-	padding-left: 20px;
-	margin: 8px 0 16px;
-}
-
-.habitude-connect-modal li {
-	margin-bottom: 6px;
-}
-
-.habitude-connect-code {
-	font-size: 1.8em;
-	font-weight: 700;
-	letter-spacing: 0.2em;
-	text-align: center;
-	margin: 12px 0;
-}
-
-.habitude-connect-hint {
-	color: var(--text-muted);
-	font-size: 0.9em;
-}
-
-.habitude-connect-warn {
-	color: var(--text-warning, var(--text-muted));
-	font-size: 0.9em;
 }
 
 /* Weekly review modal */
@@ -242,6 +305,10 @@
 	overflow: hidden;
 }
 
+.habitude-today-card .habitude-bar {
+	background: var(--background-modifier-border);
+}
+
 .habitude-bar-fill {
 	height: 100%;
 	background: var(--interactive-accent);
@@ -266,8 +333,11 @@
 	margin-top: 0;
 }
 
-.habitude-coach-setup ol {
+.habitude-coach-setup-needs {
 	padding-left: 20px;
+	margin: 8px 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
 }
 
 .habitude-coach-key {
@@ -534,6 +604,25 @@
 	font-size: var(--font-ui-small);
 }
 
+.habitude-companion-does {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 16px;
+}
+
+.habitude-companion-does-item {
+	padding: 12px 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+}
+
+.habitude-companion-does-item p {
+	margin: 6px 0 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
 .habitude-companion-plan-header {
 	margin-top: 20px;
 }
@@ -689,6 +778,40 @@
 	.habitude-companion-card-actions button,
 	.habitude-companion-actions > *,
 	.habitude-companion-billing-option {
+		min-height: 44px;
+	}
+}
+
+/* A narrow side pane: the week fits without sideways scrolling. */
+@container (max-width: 420px) {
+	.habitude-grid {
+		min-width: 0;
+	}
+
+	.habitude-grid th,
+	.habitude-grid td {
+		padding: 6px 1px;
+	}
+
+	.habitude-grid .habitude-col-habit {
+		width: 30%;
+	}
+
+	.habitude-toggle {
+		width: 22px;
+		min-width: 22px;
+		height: 22px;
+		font-size: 11px;
+	}
+
+	.habitude-day-name {
+		font-size: 0.65em;
+	}
+}
+
+@media (pointer: coarse) {
+	.habitude-starter,
+	.habitude-today-done {
 		min-height: 44px;
 	}
 }

@@ -22,6 +22,26 @@ export function streakFor(habitId: string, checksByDay: Map<string, Set<string>>
 	return streak;
 }
 
+/**
+ * Length of a run of checked days that stopped 2 to 7 days ago, or 0. A habit
+ * checked today or yesterday is still going, and an older stop is not news.
+ */
+export function pausedRunFor(habitId: string, checksByDay: Map<string, Set<string>>, today = todayKey()): number {
+	const checked = (key: string) => checksByDay.get(key)?.has(habitId) ?? false;
+	if (checked(today) || checked(addDays(today, -1))) return 0;
+	for (let gap = 2; gap <= 7; gap++) {
+		let cursor = addDays(today, -gap);
+		if (!checked(cursor)) continue;
+		let days = 0;
+		while (checked(cursor) && days <= 370) {
+			days++;
+			cursor = addDays(cursor, -1);
+		}
+		return days;
+	}
+	return 0;
+}
+
 /** Fraction of the given week days checked (0..1). */
 export function weekRateFor(habitId: string, weekKeys: string[], checksByDay: Map<string, Set<string>>): number {
 	if (weekKeys.length === 0) return 0;

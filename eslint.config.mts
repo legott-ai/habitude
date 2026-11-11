@@ -15,6 +15,7 @@ export default defineConfig(
 		'test/i18n/dist',
 		'test/companion/dist',
 		'test/transfer/dist',
+		'test/today/dist',
 		'esbuild.config.mjs',
 		'version-bump.mjs',
 		'versions.json',

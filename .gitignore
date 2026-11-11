@@ -11,3 +11,4 @@ test/i18n/dist/
 test/companion/dist/
 test-vault/
 test/transfer/dist/
+test/today/dist/

@@ -1,11 +1,11 @@
 import { Modal, type App } from 'obsidian';
-import { buildCompanionUrl, COMPANION_PLANS, type CompanionEntryPoint } from '../companion';
+import { buildCompanionUrl, COMPANION_FEATURES, COMPANION_PLANS, type CompanionEntryPoint } from '../companion';
 import { t } from '../i18n';
 
 type BillingPeriod = 'monthly' | 'annual';
 let modalSequence = 0;
 
-/** Local plan preview. No account, checkout, or connection is fabricated here. */
+/** What Habitude does and what is still being built, then the plan preview. No account, checkout, or connection is fabricated here. */
 export class CompanionModal extends Modal {
 	private billingPeriod: BillingPeriod = 'monthly';
 	private readonly instanceId = `habitude-companion-${++modalSequence}`;
@@ -23,6 +23,17 @@ export class CompanionModal extends Modal {
 			text: t('companion.intro'),
 			cls: 'habitude-companion-intro',
 		});
+
+		// The reason to look first, each line with its real status; plans come after.
+		const does = this.contentEl.createEl('section', { cls: 'habitude-companion-does' });
+		does.createEl('h3', { text: t('companion.does.title') });
+		for (const feature of COMPANION_FEATURES) {
+			const item = does.createDiv({ cls: 'habitude-companion-does-item' });
+			const heading = item.createDiv({ cls: 'habitude-companion-plan-heading' });
+			heading.createEl('h4', { text: t(`companion.does.${feature.id}.title`) });
+			heading.createSpan({ text: t(`companion.plan.${feature.status}`), cls: 'habitude-companion-badge' });
+			item.createEl('p', { text: t(`companion.does.${feature.id}.body`) });
+		}
 
 		const current = this.contentEl.createEl('section', { cls: 'habitude-companion-current' });
 		current.createEl('h3', { text: t('companion.current.title') });

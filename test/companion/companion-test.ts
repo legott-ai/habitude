@@ -71,20 +71,29 @@ function testPlans(module: CompanionModule): void {
 function testRecommendations(module: CompanionModule): void {
 	console.log('Pure contextual recommendations');
 	const recommend = module.recommendCompanion;
-	check('no habits starts with setup', recommend({ habitCount: 0, weekChecks: 0 }) === 'start');
-	check('first unchecked habit starts with setup', recommend({ habitCount: 1, weekChecks: 0 }) === 'start');
-	check('early activity without configured coach suggests coach', recommend({ habitCount: 2, weekChecks: 3 }) === 'coach');
-	check('configured coach suggests review', recommend({ habitCount: 2, weekChecks: 3, coachConfigured: true }) === 'review');
-	check('seven checks suggests review', recommend({ habitCount: 1, weekChecks: 7 }) === 'review');
-	check('fractional count normalized deterministically', recommend({ habitCount: 1.9, weekChecks: 6.9 }) === 'coach');
-	const context = Object.freeze({ habitCount: 2, weekChecks: 9, coachConfigured: false });
+	const paused = { title: 'Walk', days: 5 };
+	check('no habits: nothing is suggested', recommend({ habitCount: 0, weekChecks: 0 }) === null);
+	check('a first unchecked habit is left alone', recommend({ habitCount: 1, weekChecks: 0 }) === null);
+	check('a couple of checks is not yet a question', recommend({ habitCount: 2, weekChecks: 2 }) === null);
+	check('three checks raise the "why" card', recommend({ habitCount: 2, weekChecks: 3 }) === 'review');
+	check('a paused run comes first', recommend({ habitCount: 2, weekChecks: 9, pausedStreak: paused }) === 'restart');
+	check('a paused run counts with no checks this week', recommend({ habitCount: 1, weekChecks: 0, pausedStreak: paused }) === 'restart');
+	check('a run shorter than three days is not a paused run', recommend({ habitCount: 1, weekChecks: 0, pausedStreak: { title: 'Walk', days: 2 } }) === null);
+	check('a paused run without a title is ignored', recommend({ habitCount: 1, weekChecks: 4, pausedStreak: { title: ' ', days: 9 } }) === 'review');
+	check('no habits beats a paused run', recommend({ habitCount: 0, weekChecks: 0, pausedStreak: paused }) === null);
+	check('fractional count normalized deterministically', recommend({ habitCount: 1.9, weekChecks: 2.9 }) === null);
+	const context = Object.freeze({ habitCount: 2, weekChecks: 9, pausedStreak: null });
 	check('repeated calls have no impression state', Array.from({ length: 20 }, () => recommend(context)).every(reason => reason === 'review'));
-	check('context is not mutated', JSON.stringify(context) === '{"habitCount":2,"weekChecks":9,"coachConfigured":false}');
+	check('context is not mutated', JSON.stringify(context) === '{"habitCount":2,"weekChecks":9,"pausedStreak":null}');
 	for (const count of [NaN, Infinity, -Infinity, -1, 0.1]) {
-		check('invalid habit count safely starts with setup', recommend({ habitCount: count, weekChecks: 7 }) === 'start');
-		check('invalid check count safely starts with setup', recommend({ habitCount: 1, weekChecks: count }) === 'start');
+		check('invalid habit count suggests nothing', recommend({ habitCount: count, weekChecks: 7 }) === null);
+		check('invalid check count suggests nothing', recommend({ habitCount: 1, weekChecks: count }) === null);
 	}
-	check('string counts are not coerced', recommend({ habitCount: '2' as unknown as number, weekChecks: 7 }) === 'start');
+	check('string counts are not coerced', recommend({ habitCount: '2' as unknown as number, weekChecks: 7 }) === null);
+	const features = module.COMPANION_FEATURES;
+	check('only the web is offered as available today', features.filter(feature => feature.status === 'available').map(feature => feature.id).join() === 'web');
+	check('Habi and the AI link are marked planned', features.filter(feature => feature.status === 'planned').map(feature => feature.id).join() === 'habi,agent');
+	check('feature list is frozen', Object.isFrozen(features) && features.every(feature => Object.isFrozen(feature)));
 }
 
 function testPreference(module: CompanionModule): void {

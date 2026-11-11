@@ -4,7 +4,7 @@
  */
 export type CompanionEntryPoint = 'checklist' | 'coach' | 'review' | 'settings' | 'command';
 export type CompanionIntent = 'explore' | 'plans';
-export type CompanionReason = 'start' | 'review' | 'coach';
+export type CompanionReason = 'restart' | 'review' | 'coach';
 
 const COMPANION_ROOT = 'https://habitude.ai/';
 
@@ -62,11 +62,31 @@ export const COMPANION_PLANS: readonly CompanionPlan[] = Object.freeze([
 	} satisfies CompanionPlan),
 ]);
 
+/** What Habitude does beyond this plugin, each with its real status. Only what is on offer today is 'available'. */
+export interface CompanionFeature {
+	readonly id: 'web' | 'habi' | 'agent';
+	readonly status: 'available' | 'planned';
+}
+export const COMPANION_FEATURES: readonly CompanionFeature[] = Object.freeze([
+	Object.freeze({ id: 'web', status: 'available' } satisfies CompanionFeature),
+	Object.freeze({ id: 'habi', status: 'planned' } satisfies CompanionFeature),
+	Object.freeze({ id: 'agent', status: 'planned' } satisfies CompanionFeature),
+]);
+
+/** A run of checked days that stopped a few days ago. */
+export interface PausedStreak {
+	readonly title: string;
+	readonly days: number;
+}
+
 export interface CompanionContext {
 	readonly habitCount: number;
 	readonly weekChecks: number;
-	readonly coachConfigured?: boolean;
+	readonly pausedStreak?: PausedStreak | null;
 }
+
+export const PAUSED_STREAK_MIN_DAYS = 3;
+export const REVIEW_MIN_CHECKS = 3;
 
 function normalizedCount(value: unknown): number {
 	return typeof value === 'number' && Number.isFinite(value)
@@ -75,15 +95,17 @@ function normalizedCount(value: unknown): number {
 }
 
 /**
- * Pick copy from existing, local context. No impressions, click counters,
- * timers, device identifiers, or recommendation state are recorded.
+ * The moment worth a suggestion, from existing local context, or none: a
+ * suggestion follows a question the numbers raise, never an empty checklist.
+ * No impressions, click counters, timers, device identifiers, or
+ * recommendation state are recorded.
  */
-export function recommendCompanion(context: CompanionContext): CompanionReason {
-	const habits = normalizedCount(context.habitCount);
-	const checks = normalizedCount(context.weekChecks);
-	if (habits === 0 || checks === 0) return 'start';
-	if (context.coachConfigured !== true && checks < 7) return 'coach';
-	return 'review';
+export function recommendCompanion(context: CompanionContext): 'restart' | 'review' | null {
+	if (normalizedCount(context.habitCount) === 0) return null;
+	const paused = context.pausedStreak;
+	if (paused && typeof paused.title === 'string' && paused.title.trim()
+		&& normalizedCount(paused.days) >= PAUSED_STREAK_MIN_DAYS) return 'restart';
+	return normalizedCount(context.weekChecks) >= REVIEW_MIN_CHECKS ? 'review' : null;
 }
 
 /** Preserve explicit opt-out when loading older or malformed settings. */

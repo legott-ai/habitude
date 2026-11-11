@@ -2,12 +2,13 @@
 // local progress graphs, and an opt-in share button.
 
 import { ItemView, Menu, Notice, WorkspaceLeaf } from 'obsidian';
-import { t } from '../i18n';
+import { getUiLocale, t } from '../i18n';
 import type { HabitStore } from '../store';
 import type { Habit } from '../types';
-import { recommendCompanion, type CompanionContext, type CompanionEntryPoint } from '../companion';
+import { PAUSED_STREAK_MIN_DAYS, recommendCompanion, type CompanionContext, type CompanionEntryPoint, type PausedStreak } from '../companion';
 import { renderCompanionCard } from './companion-card';
-import { recentKeys, streakFor, weekRateFor } from '../stats';
+import { pausedRunFor, recentKeys, streakFor, weekRateFor } from '../stats';
+import { STARTER_HABITS, todaySummary, topicParticle } from '../today';
 import { historyStripSvg, weeklyBarsSvg, type GraphDay } from '../graphs';
 import { shareFromStore } from '../share';
 import { ReviewModal } from './review-modal';
@@ -29,9 +30,9 @@ interface ViewDeps {
 	getCheckmarkColor: () => string;
 	getPluginVersion: () => string;
 	getShowCompanionPrompts: () => boolean;
-	getCoachConfigured: () => boolean;
 	onExploreCompanion: (entryPoint: CompanionEntryPoint) => void;
 	onHideCompanionPrompts: () => Promise<void>;
+	onStatusChange?: () => void;
 }
 
 export class ChecklistView extends ItemView {
@@ -91,6 +92,13 @@ export class ChecklistView extends ItemView {
 			this.weekOffset++;
 			void this.render();
 		};
+		if (this.weekOffset !== 0) {
+			const back = header.createEl('button', { text: t('checklist.thisWeek'), cls: 'habitude-review-btn' });
+			back.onclick = () => {
+				this.weekOffset = 0;
+				void this.render();
+			};
+		}
 		header.createDiv({ cls: 'habitude-spacer' });
 		const reviewBtn = header.createEl('button', { text: t('checklist.weeklyReview'), cls: 'habitude-review-btn' });
 		reviewBtn.onclick = () => new ReviewModal(this.app, store, weekKeys, {
@@ -106,12 +114,33 @@ export class ChecklistView extends ItemView {
 			attr: { placeholder: t('checklist.newHabitPlaceholder'), type: 'text' },
 		});
 		const addBtn = addRow.createEl('button', { text: t('checklist.add'), cls: 'habitude-add-btn' });
+		const starterBtns: HTMLButtonElement[] = [];
+		let addingHabit = false;
+		const setAddControlsDisabled = (disabled: boolean) => {
+			addingHabit = disabled;
+			input.disabled = disabled;
+			addBtn.disabled = disabled;
+			for (const btn of starterBtns) {
+				btn.disabled = disabled;
+			}
+		};
+		const addHabit = async (title: string) => {
+			if (addingHabit) return;
+			setAddControlsDisabled(true);
+			try {
+				await store.addHabit(title);
+				new Notice(t('checklist.habitAdded', { title }));
+				this.deps.onStatusChange?.();
+				void this.render();
+			} catch {
+				setAddControlsDisabled(false);
+				new Notice(t('checklist.addHabitFailed'));
+			}
+		};
 		const doAdd = async () => {
 			const title = input.value.trim();
 			if (!title) return;
-			await store.addHabit(title);
-			new Notice(t('checklist.habitAdded', { title }));
-			void this.render();
+			await addHabit(title);
 		};
 		addBtn.onclick = () => void doAdd();
 		input.onkeydown = (e) => {
@@ -127,9 +156,78 @@ export class ChecklistView extends ItemView {
 		]);
 		if (seq !== this.renderSeq) return; // superseded while loading
 		if (habits.length === 0) {
+			// First run: one clear next step. An empty grid, graphs and sharing
+			// would only show that there is nothing there yet.
+			reviewBtn.remove();
 			const empty = container.createDiv({ cls: 'habitude-empty' });
-			empty.createEl('p', { text: t('checklist.emptyTitle') });
-			empty.createEl('p', { text: t('checklist.emptyHint') });
+			empty.createEl('strong', { text: t('checklist.emptyTitle'), cls: 'habitude-empty-title' });
+			empty.createEl('p', { text: t('checklist.emptyHint'), cls: 'habitude-empty-hint' });
+			const starters = empty.createDiv({ cls: 'habitude-starters' });
+			for (const title of STARTER_HABITS[getUiLocale()]) {
+				const chip = starters.createEl('button', {
+					text: title,
+					cls: 'habitude-starter',
+					attr: { type: 'button', 'aria-label': t('checklist.starterAria', { title }) },
+				});
+				chip.disabled = addingHabit;
+				starterBtns.push(chip);
+				chip.onclick = () => {
+					void addHabit(title);
+				};
+			}
+			this.companionHost = null;
+			this.companionContext = null;
+			container.createDiv({ cls: 'habitude-footer' }).createEl('p', {
+				text: t('checklist.footnote'),
+				cls: 'habitude-footnote',
+			});
+			return;
+		}
+
+		// Today first: how far along the day is and the next habit, one tap to
+		// check it. Shown for the current week only.
+		if (this.weekOffset === 0) {
+			const today = todayKey();
+			const summary = todaySummary(habits, weekChecks.get(today));
+			const card = container.createDiv({ cls: 'habitude-today-card' });
+			const head = card.createDiv({ cls: 'habitude-today-head' });
+			head.createSpan({
+				text: t('checklist.today.count', { done: summary.done, total: summary.total }),
+				cls: 'habitude-today-count',
+			});
+			const bar = card.createDiv({ cls: 'habitude-bar' });
+			bar.createDiv({
+				cls: 'habitude-bar-fill',
+				attr: { style: `width: ${Math.round((summary.done / summary.total) * 100)}%` },
+			});
+			const row = card.createDiv({ cls: 'habitude-today-row' });
+			const next = summary.next;
+			if (next) {
+				row.createSpan({
+					text: t('checklist.today.ask', { title: next.title, particle: topicParticle(next.title) }),
+					cls: 'habitude-today-ask',
+				});
+				const done = row.createEl('button', {
+					text: t('checklist.today.done'),
+					cls: 'habitude-today-done',
+					attr: { type: 'button' },
+				});
+				done.onclick = () => {
+					done.disabled = true;
+					void store
+						.setCheck(today, next.id, next.title, true)
+						.then(() => {
+							this.deps.onStatusChange?.();
+							return this.render();
+						})
+						.catch(() => {
+							done.disabled = false;
+							new Notice(t('checklist.saveCheckFailed'));
+						});
+				};
+			} else {
+				row.createSpan({ text: t('checklist.today.allDone'), cls: 'habitude-today-ask' });
+			}
 		}
 
 		// Grid
@@ -166,10 +264,14 @@ export class ChecklistView extends ItemView {
 				const menu = new Menu();
 				menu.addItem((item) =>
 					item.setTitle(t('checklist.archiveHabit')).onClick(() => {
-						void store.archiveHabit(habit.id).then(() => {
-							new Notice(t('checklist.habitArchived', { title: habit.title }));
-							void this.render();
-						});
+						void store
+							.archiveHabit(habit.id)
+							.then(() => {
+								new Notice(t('checklist.habitArchived', { title: habit.title }));
+								this.deps.onStatusChange?.();
+								void this.render();
+							})
+							.catch(() => new Notice(t('checklist.archiveHabitFailed')));
 					}),
 				);
 				menu.showAtMouseEvent(e);
@@ -188,10 +290,17 @@ export class ChecklistView extends ItemView {
 					},
 				});
 				btn.onclick = () => {
+					btn.disabled = true;
 					void store
 						.setCheck(key, habit.id, habit.title, !checked)
-						.then(() => this.render())
-						.catch(() => new Notice(t('checklist.saveCheckFailed')));
+						.then(() => {
+							this.deps.onStatusChange?.();
+							return this.render();
+						})
+						.catch(() => {
+							btn.disabled = false;
+							new Notice(t('checklist.saveCheckFailed'));
+						});
 				};
 			}
 		}
@@ -242,16 +351,30 @@ export class ChecklistView extends ItemView {
 			for (const habit of habits) {
 				this.renderHabitGraphs(graphsBody, habit, weekChecks);
 			}
+			// A run that just stopped is the moment a suggestion is worth showing.
+			let paused: PausedStreak | null = null;
+			for (const habit of habits) {
+				const days = pausedRunFor(habit.id, weekChecks);
+				if (days >= PAUSED_STREAK_MIN_DAYS && days > (paused?.days ?? 0)) paused = { title: habit.title, days };
+			}
+			if (paused && this.companionContext) {
+				this.companionContext = { ...this.companionContext, pausedStreak: paused };
+				this.refreshCompanionPrompt();
+			}
 		})();
 
-		// Discovery follows local value; no promotion competes with the first habit.
+		// Discovery follows a question the numbers raise; nothing competes with the first habit.
 		const footer = container.createDiv({ cls: 'habitude-footer' });
 		this.companionHost = footer.createDiv();
 		this.companionContext = {
 			habitCount: habits.length,
-			weekChecks: weekKeys.reduce((total, key) => total + habits.filter((h) =>
-				weekChecks.get(key)?.has(h.id)).length, 0),
-			coachConfigured: this.deps.getCoachConfigured(),
+			weekChecks:
+				this.weekOffset === 0
+					? weekKeys.reduce(
+							(total, key) => total + habits.filter((h) => weekChecks.get(key)?.has(h.id)).length,
+							0,
+						)
+					: 0,
 		};
 		this.refreshCompanionPrompt();
 		footer.createEl('p', {
@@ -264,9 +387,13 @@ export class ChecklistView extends ItemView {
 	refreshCompanionPrompt(): void {
 		this.companionHost?.empty();
 		if (!this.companionHost || !this.companionContext?.habitCount || !this.deps.getShowCompanionPrompts()) return;
+		const reason = recommendCompanion(this.companionContext);
+		if (!reason) return;
+		const paused = this.companionContext.pausedStreak;
 		renderCompanionCard(this.companionHost, {
 			entryPoint: 'checklist',
-			reason: recommendCompanion(this.companionContext),
+			reason,
+			vars: reason === 'restart' && paused ? { title: paused.title, days: paused.days } : undefined,
 			onExplore: () => this.deps.onExploreCompanion('checklist'),
 			onDismiss: () => { void this.deps.onHideCompanionPrompts(); },
 		});
@@ -314,7 +441,9 @@ export class ChecklistView extends ItemView {
  * there), parsed as SVG, and imported as a DOM node.
  */
 function mountSvg(host: HTMLElement, svg: string): void {
-	const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
-	const node = document.importNode(doc.documentElement, true);
+	const ownerDoc = host.ownerDocument ?? document;
+	const Parser = ownerDoc.defaultView?.DOMParser ?? DOMParser;
+	const doc = new Parser().parseFromString(svg, 'image/svg+xml');
+	const node = ownerDoc.importNode(doc.documentElement, true);
 	host.appendChild(node);
 }
