@@ -1,7 +1,7 @@
 {
 	"name": "habitude-checklist",
-	"version": "0.5.0",
-	"description": "7-day habit checklist with streaks and weekly review for Obsidian",
+	"version": "0.6.0",
+	"description": "7-day habit checklist with a today card, streaks and weekly review for Obsidian",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
