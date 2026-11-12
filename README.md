@@ -12,7 +12,7 @@ A 7-day habit checklist for Obsidian: add habits, check off today in one tap, tr
 
 ![AI coach](assets/coach.png)
 
-*The AI coach greets you with your own stats and chats about your habits — bring your own API key (BYOK): Gemini, OpenAI, Claude, OpenRouter, or a local model via Ollama / LM Studio.*
+*The AI coach greets you with your own stats and chats about your habits. Start it with a model already on your computer (Ollama or LM Studio, no key), or bring your own API key: Gemini, OpenAI, Claude or OpenRouter.*
 
 ## Data layout (in your vault)
 
@@ -38,7 +38,7 @@ Both files are human-readable and hand-editable. The plugin re-reads them on eve
 - **Weekly review** (command *Open weekly review* or the button in the view): per-habit completion bars, total checks.
 - **Command** *Toggle today for a habit*: quick toggle from the command palette.
 - **Status bar**: today's progress (`✓ 3/5 today`).
-- **AI coach** (ribbon icon, or command *Open AI coach*): chat with a coach that knows your habits — your streaks, weekly rates, and weekday patterns are shared with the model automatically as statistics. Bring your own key (BYOK): Gemini, OpenAI, Claude, OpenRouter, or a local model via Ollama / LM Studio.
+- **AI coach** (ribbon icon, or command *Open AI coach*): chat with a coach that knows your habits — your streaks, weekly rates, and weekday patterns are shared with the model automatically as statistics. Bring your own key (BYOK): Gemini, OpenAI, Claude, OpenRouter, or a local model via Ollama / LM Studio. On desktop, the coach can also start with a local model and no key: *Find local models* lists the chat models in Ollama or LM Studio on this computer, and one click starts the chat.
   - See it in action: [coach greeting](#screenshots) · [checklist demo](assets/demo.gif)
 - **Settings** (`Settings → Habitude checklist`): data folder, week start day (Mon/Sun), AI provider, API key, model, base URL, coach language.
 - **Explore Habitude**: a local overview lists what Habitude does beyond this plugin, each item marked *Available now* or *In preparation*, and separates the free plugin from planned Habitude Sync and Plus services. Compare monthly and annual USD totals before choosing to visit the website. Open it from a contextual suggestion, settings, or the command *Explore Habitude*.
@@ -71,6 +71,7 @@ Run *Export habits for Habitude* or use **Settings → Habitude checklist → Mo
 - **Share progress: explicit opt-in.** Only aggregate statistics (habit titles, streaks, completion rates) are ever transmitted — never your note contents. The payload is `{version, pluginVersion, generatedAt, stats: {habits: [{title, streak, weekRate}]}}` posted to `https://habitude.ai/api/share`; nothing is sent unless you click the button.
 - **Clipboard: write-only, on your tap.** The only clipboard access is writing the share link to your clipboard right after you press *Share progress*; the plugin never reads your clipboard.
 - **AI coach: opt-in BYOK.** The coach only activates if you pick a provider and — for cloud providers — paste your own API key. Provider charges and access conditions apply. The key is stored in this vault's plugin settings, and requests go **directly to the provider you selected** — never to Habitude servers. Each message carries your habit titles and *statistics* (streaks, rates, patterns), plus the chat text you enter, never unrelated raw note contents. Local providers (Ollama, LM Studio) need no key at all.
+- **Finding local models: only when you click.** *Find local models* on the coach setup screen runs only when you click it and asks only `localhost:11434` (Ollama) and `localhost:1234` (LM Studio) for their model lists. Nothing else is requested and nothing about your habits is sent.
 - **Habitude promotion: local and optional.** Suggestions stay inside the plugin's own interface, can be hidden permanently, and make no network requests. Which one to show is decided from your local check history; that decision is not recorded or sent anywhere. Opening the overview or switching its billing period is entirely local. Only the explicit *Visit Habitude website* link opens `https://habitude.ai/` in your browser.
 - **Fixed source information on website links.** Links include only `utm_source=obsidian`, `utm_medium=plugin`, `utm_campaign=companion`, a fixed UI location (`checklist`, `coach`, `review`, `settings`, or `command`), and `intent=explore`. No habit information, statistics, vault/device identifiers, credentials, or chat text are included. No analytics SDKs, impression counters, click events, beacons, prefetching, or background requests are added. The browser makes an ordinary page request; the website applies its own [privacy policy](https://habitude.ai/en/privacy). Website visits are not a count of plugin users or installs.
 

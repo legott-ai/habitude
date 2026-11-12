@@ -430,6 +430,69 @@
 	align-items: center;
 }
 
+/* Coach setup: models found on this computer, then the own-key form. */
+.habitude-coach-local {
+	margin-top: 12px;
+	padding: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m, 8px);
+	background: var(--background-secondary);
+}
+
+.habitude-coach-local h4 {
+	margin: 0 0 4px;
+}
+
+.habitude-coach-local p {
+	margin: 4px 0 8px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.habitude-coach-local-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.habitude-coach-local-model {
+	display: flex;
+	width: 100%;
+	min-height: 32px;
+	height: auto;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	text-align: start;
+	white-space: normal;
+}
+
+.habitude-coach-local-model-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.habitude-coach-local-model-provider {
+	flex-shrink: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.habitude-coach-byok-title {
+	margin-top: 16px;
+	margin-bottom: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+}
+
+@media (pointer: coarse) {
+	.habitude-coach-local-model {
+		min-height: 44px;
+	}
+}
+
 /* ---- Progress graphs (local SVG, theme-aware) ---- */
 
 .habitude-graphs {

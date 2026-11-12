@@ -256,6 +256,8 @@ export class MarkdownRenderer {
 	}
 }
 export class Plugin {}
+/** Desktop by default, so the coach setup screen renders its local-model section. */
+export const Platform = { isDesktopApp: true, isMobile: false };
 /** Not implemented in the mock — tests inject their own transport. */
 export function requestUrl(): Promise<never> {
 	return Promise.reject(new Error('requestUrl is not mocked; inject a request function'));

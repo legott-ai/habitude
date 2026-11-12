@@ -1,5 +1,6 @@
-// AI Coach chat view — BYOK (bring your own key): Gemini, OpenAI, Claude,
-// OpenRouter, or a local model via Ollama / LM Studio.
+// AI Coach chat view — a local model found on this computer (Ollama /
+// LM Studio, no key), or BYOK (bring your own key): Gemini, OpenAI, Claude,
+// OpenRouter, or any OpenAI-compatible endpoint.
 //
 // The chat runs entirely between this device and the selected provider. Your
 // API key is stored only in this vault's plugin data and is never sent to
@@ -7,7 +8,7 @@
 // is the curation: every message carries your live habit stats (twin-lite)
 // plus the Habitude coaching persona.
 
-import { ItemView, MarkdownRenderer, Notice, WorkspaceLeaf } from 'obsidian';
+import { ItemView, MarkdownRenderer, Notice, Platform, requestUrl, WorkspaceLeaf } from 'obsidian';
 import { t } from '../i18n';
 import type HabitudePlugin from '../main';
 import { buildTwinLiteContext } from '../coach/context';
@@ -29,6 +30,7 @@ import {
 	type CoachConfigProblem,
 } from '../coach/providers';
 import { buildGreeting, buildSystemPrompt } from '../coach/prompt';
+import { findLocalModels, type LocalModel } from '../coach/local-models';
 import { renderCompanionCard } from './companion-card';
 
 export const COACH_VIEW_TYPE = 'habitude-coach-view';
@@ -36,6 +38,22 @@ export const COACH_VIEW_TYPE = 'habitude-coach-view';
 function translateOrFallback(primaryKey: string, fallbackKey: string): string {
 	const resolved = t(primaryKey);
 	return resolved === primaryKey ? t(fallbackKey) : resolved;
+}
+
+/**
+ * GET a local model server's JSON body. A status outside 200–299 is a
+ * failure; an unreadable body counts as no answer.
+ */
+async function fetchLocalJson(url: string): Promise<unknown> {
+	const res = await requestUrl({ url, method: 'GET', throw: false });
+	if (res.status < 200 || res.status > 299) {
+		throw new Error(`HTTP ${res.status}`);
+	}
+	try {
+		return JSON.parse(res.text) as unknown;
+	} catch {
+		return undefined;
+	}
 }
 
 export class CoachView extends ItemView {
@@ -57,6 +75,11 @@ export class CoachView extends ItemView {
 	private lastSeededBaseUrl = '';
 	private lastSeededModel = '';
 	private companionHost: HTMLElement | null = null;
+	private localHost: HTMLElement | null = null;
+	/** Models found by the last search; null until the person searches. Never saved. */
+	private localModels: LocalModel[] | null = null;
+	private findingLocal = false;
+	private localSeq = 0;
 
 	constructor(leaf: WorkspaceLeaf, plugin: HabitudePlugin) {
 		super(leaf);
@@ -89,6 +112,7 @@ export class CoachView extends ItemView {
 		this.inputEl = null;
 		this.sendBtnEl = null;
 		this.companionHost = null;
+		this.resetLocalModels();
 	}
 
 	private providerLabel(): string {
@@ -140,11 +164,13 @@ export class CoachView extends ItemView {
 			this.logEl = null;
 			this.inputEl = null;
 			this.sendBtnEl = null;
+			this.localHost = null;
 			container.addClass('habitude-coach');
 			this.renderSetup(container);
 			this.companionHost = container.createDiv();
 			this.refreshCompanionPrompt();
 		} else {
+			this.resetLocalModels();
 			await this.renderChat(container, seq);
 		}
 	}
@@ -170,6 +196,13 @@ export class CoachView extends ItemView {
 		const wrap = container.createDiv({ cls: 'habitude-coach-setup' });
 		wrap.createEl('h3', { text: t('coach.setupTitle') });
 		wrap.createEl('p', { text: t('coach.setupDesc') });
+
+		if (Platform.isDesktopApp) {
+			this.localHost = wrap.createDiv({ cls: 'habitude-coach-local' });
+			this.renderLocalSection();
+			// "Or connect a provider…" only makes sense under the local option.
+			wrap.createEl('h4', { cls: 'habitude-coach-byok-title', text: t('coach.byok.title') });
+		}
 
 		const problems = this.configProblems();
 		if (problems.length > 0) {
@@ -292,6 +325,77 @@ export class CoachView extends ItemView {
 		if (keyInput) keyInput.addEventListener('keydown', enterSaves);
 		baseInput.addEventListener('keydown', enterSaves);
 		if (modelInput) modelInput.addEventListener('keydown', enterSaves);
+	}
+
+	// -- Local models (Ollama / LM Studio on this computer) ------------------
+
+	/** Drop any search result; a search still running is ignored when it ends. */
+	private resetLocalModels(): void {
+		++this.localSeq;
+		this.findingLocal = false;
+		this.localModels = null;
+		this.localHost = null;
+	}
+
+	private renderLocalSection(): void {
+		const host = this.localHost;
+		if (!host) return;
+		host.empty();
+		host.createEl('h4', { text: t('coach.local.title') });
+		host.createEl('p', { text: t('coach.local.desc') });
+		const find = host.createEl('button', {
+			text: this.findingLocal ? t('coach.local.finding') : t('coach.local.find'),
+		});
+		find.disabled = this.findingLocal;
+		find.addEventListener('click', () => {
+			void this.findLocal();
+		});
+
+		const models = this.localModels;
+		if (this.findingLocal || models === null) return;
+		if (models.length === 0) {
+			host.createEl('p', { text: t('coach.local.none') });
+			host.createEl('p', { text: t('coach.local.howto') });
+			return;
+		}
+		const list = host.createDiv({ cls: 'habitude-coach-local-list' });
+		for (const model of models) {
+			const choose = list.createEl('button', {
+				cls: 'habitude-coach-local-model',
+				attr: { 'aria-label': t('coach.local.useAria', { name: model.name }) },
+			});
+			choose.createSpan({ cls: 'habitude-coach-local-model-name', text: model.name });
+			choose.createSpan({
+				cls: 'habitude-coach-local-model-provider',
+				text: getProvider(model.provider).label,
+			});
+			choose.addEventListener('click', () => {
+				void this.chooseLocalModel(model);
+			});
+		}
+	}
+
+	/** Asks the local servers only now, on the person's click. */
+	private async findLocal(): Promise<void> {
+		if (this.findingLocal) return;
+		const seq = this.localSeq;
+		this.findingLocal = true;
+		this.renderLocalSection();
+		const models = await findLocalModels(fetchLocalJson);
+		if (seq !== this.localSeq) return;
+		this.findingLocal = false;
+		this.localModels = models;
+		this.renderLocalSection();
+	}
+
+	/** Saving re-renders the view; with a local provider and model set, the chat opens. */
+	private async chooseLocalModel(model: LocalModel): Promise<void> {
+		this.resetLocalModels();
+		this.plugin.settings.llmProvider = model.provider;
+		this.plugin.settings.llmModel = normalizeLlmModel(model.name);
+		// Empty means the provider's default local address. The stored API key is left alone.
+		this.plugin.settings.llmBaseUrl = '';
+		await this.plugin.saveSettings();
 	}
 
 	// -- Chat ---------------------------------------------------------------

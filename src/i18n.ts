@@ -114,8 +114,8 @@ const en: Dict = {
 	'companion.card.restart.body': 'How did you get going again last time? Habitude is being built to answer that from your own notes.',
 	'companion.card.review.title': 'After the numbers comes "why"',
 	'companion.card.review.body': 'Why a week went well or badly is in what you wrote. Habitude is being built to answer that from your own notes.',
-	'companion.card.coach.title': 'Asking without an API key is on the way',
-	'companion.card.coach.body': 'In the Habitude app, Habi is being built to answer on your Mac from your own records. A link to the AI you already use is planned too.',
+	'companion.card.coach.title': 'Want answers from your notes, not only your stats?',
+	'companion.card.coach.body': 'This coach sees your habit statistics. In the Habitude app, Habi is being built to answer on your Mac from your own notes. A link to the AI you already use is planned too.',
 	'companion.card.explore': 'See what Habitude does',
 	'companion.card.dismiss': 'Hide app suggestions',
 	'companion.card.dismissAria': 'Hide all app suggestions. Restore them in Habitude settings.',
@@ -189,7 +189,7 @@ const en: Dict = {
 	'checklist.toggleAria': '{title} on {date}',
 
 	// Coach view
-	'coach.setupTitle': 'AI coach — bring your own key',
+	'coach.setupTitle': 'AI coach',
 	'coach.setupDesc':
 		'Pick an AI provider and chat with a coach that knows your habits — your streaks, weekly rates, and weak days are shared with the model automatically as statistics.',
 	'coach.setupNeedsBaseUrl':
@@ -211,6 +211,16 @@ const en: Dict = {
 	'coach.thinking': 'Coach is thinking…',
 	'coach.genericError': 'Something went wrong. Please try again.',
 	'coach.fallbackGreeting': "Hi, I'm your Habitude Coach. What's on your mind?",
+	'coach.local.title': 'Use a model on this computer',
+	'coach.local.desc':
+		'No API key needed. Works with Ollama or LM Studio running on this computer, so your habit statistics and messages stay on it.',
+	'coach.local.find': 'Find local models',
+	'coach.local.finding': 'Looking…',
+	'coach.local.none': 'No local model found.',
+	'coach.local.howto':
+		'Install Ollama or LM Studio, download a chat model, keep it running, then try again.',
+	'coach.local.useAria': 'Start the coach with {name}',
+	'coach.byok.title': 'Or connect a provider with your own API key',
 
 	// Weekly review modal
 	'review.title': 'Weekly review',
@@ -344,8 +354,8 @@ const ko: Dict = {
 	'companion.card.restart.body': '지난번엔 어떻게 다시 시작했을까요? Habitude는 이런 질문에 내 기록으로 답하도록 만들고 있습니다.',
 	'companion.card.review.title': '숫자 다음은 "왜"입니다',
 	'companion.card.review.body': '잘 된 주와 안 된 주의 이유는 내가 쓴 글 속에 있습니다. Habitude는 그 질문에 내 기록으로 답하도록 만들고 있습니다.',
-	'companion.card.coach.title': 'API 키 없이 묻는 방법을 준비하고 있어요',
-	'companion.card.coach.body': 'Habitude 앱의 하비는 Mac 안에서 내 기록으로 답하도록 만들고 있습니다. 이미 쓰는 AI와 잇는 연결도 준비 중입니다.',
+	'companion.card.coach.title': '통계 말고 내 기록으로 답을 듣고 싶다면',
+	'companion.card.coach.body': '이 코치는 습관 통계만 봅니다. Habitude 앱의 하비는 Mac 안에서 내 기록으로 답하도록 만들고 있습니다. 이미 쓰는 AI와 잇는 연결도 준비 중입니다.',
 	'companion.card.explore': 'Habitude가 하는 일 보기',
 	'companion.card.dismiss': '앱 안내 모두 숨기기',
 	'companion.card.dismissAria': '앱 안내를 모두 숨깁니다. Habitude 설정에서 다시 켤 수 있습니다.',
@@ -419,7 +429,7 @@ const ko: Dict = {
 	'checklist.toggleAria': '{date}의 {title}',
 
 	// Coach view
-	'coach.setupTitle': 'AI 코치 — 본인 키로 사용',
+	'coach.setupTitle': 'AI 코치',
 	'coach.setupDesc':
 		'AI 제공자를 선택하고 습관을 아는 코치와 대화하세요. 스트릭, 주간 완료율, 약한 요일 같은 통계가 모델에 자동으로 전달됩니다.',
 	'coach.setupNeedsBaseUrl': '사용자 지정 OpenAI 호환 엔드포인트의 Base URL을 입력하세요.',
@@ -439,6 +449,15 @@ const ko: Dict = {
 	'coach.thinking': '코치가 생각 중…',
 	'coach.genericError': '문제가 발생했습니다. 다시 시도하세요.',
 	'coach.fallbackGreeting': '안녕하세요, Habitude 코치입니다. 무슨 고민이 있으세요?',
+	'coach.local.title': '이 컴퓨터의 모델 사용',
+	'coach.local.desc':
+		'API 키가 필요 없습니다. 이 컴퓨터에서 실행 중인 Ollama나 LM Studio를 쓰므로, 습관 통계와 대화가 이 컴퓨터 밖으로 나가지 않습니다.',
+	'coach.local.find': '로컬 모델 찾기',
+	'coach.local.finding': '찾는 중…',
+	'coach.local.none': '로컬 모델을 찾지 못했습니다.',
+	'coach.local.howto': 'Ollama나 LM Studio를 설치하고 대화용 모델을 받은 뒤, 실행해 둔 상태에서 다시 시도하세요.',
+	'coach.local.useAria': '{name}(으)로 코치 시작',
+	'coach.byok.title': '또는 본인 API 키로 연결',
 
 	// Weekly review modal
 	'review.title': '주간 리뷰',
