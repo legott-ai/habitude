@@ -1,6 +1,6 @@
 # Habitude Checklist — Obsidian Plugin
 
-A 7-day habit checklist for Obsidian: add habits, check off today in one tap, track streaks and weekly completion rates, and open a weekly review. Markdown-native — your data lives in your vault as plain markdown.
+A 7-day habit checklist for Obsidian: add habits, check off today in one tap, track streaks and weekly completion rates, and open a weekly review. Everything in the checklist works without AI, an account or an API key. Markdown-native — your data lives in your vault as plain markdown.
 
 ## Screenshots
 
@@ -9,10 +9,6 @@ A 7-day habit checklist for Obsidian: add habits, check off today in one tap, tr
 *The 7-day checklist grid next to your plain-Markdown habit data. Click a cell to toggle — streaks and weekly rates update live:*
 
 ![Checklist demo](assets/demo.gif)
-
-![AI coach](assets/coach.png)
-
-*The AI coach greets you with your own stats and chats about your habits. Start it with a model already on your computer (Ollama or LM Studio, no key), or bring your own API key: Gemini, OpenAI, Claude or OpenRouter.*
 
 ## Data layout (in your vault)
 
@@ -38,11 +34,18 @@ Both files are human-readable and hand-editable. The plugin re-reads them on eve
 - **Weekly review** (command *Open weekly review* or the button in the view): per-habit completion bars, total checks.
 - **Command** *Toggle today for a habit*: quick toggle from the command palette.
 - **Status bar**: today's progress (`✓ 3/5 today`).
-- **AI coach** (ribbon icon, or command *Open AI coach*): chat with a coach that knows your habits — your streaks, weekly rates, and weekday patterns are shared with the model automatically as statistics. Bring your own key (BYOK): Gemini, OpenAI, Claude, OpenRouter, or a local model via Ollama / LM Studio. On desktop, the coach can also start with a local model and no key: *Find local models* lists the chat models in Ollama or LM Studio on this computer, and one click starts the chat.
-  - See it in action: [coach greeting](#screenshots) · [checklist demo](assets/demo.gif)
 - **Settings** (`Settings → Habitude checklist`): data folder, week start day (Mon/Sun), AI provider, API key, model, base URL, coach language.
 - **Explore Habitude**: a local overview lists what Habitude does beyond this plugin, each item marked *Available now* or *In preparation*, and separates the free plugin from planned Habitude Sync and Plus services. Compare monthly and annual USD totals before choosing to visit the website. Open it from a contextual suggestion, settings, or the command *Explore Habitude*.
 - **Optional app suggestions**: a small, dismissible card appears only at a moment that raises a question — when a run of three or more days has paused, in a week with three or more checks, after a weekly review with checks, or alongside the BYOK setup. A new or barely used checklist shows none. *Hide app suggestions* saves a global preference; restore it with **Settings → Habitude checklist → Show Habitude suggestions**. Manual discovery remains available. Changing this preference preserves unfinished habit, API-key, and chat inputs.
+
+## Optional: AI coach
+
+The checklist never needs it. If you want to talk your habits over, the coach (ribbon icon, or command *Open AI coach*) chats with a model that sees your streaks, weekly rates and weekday patterns as statistics.
+
+![AI coach](assets/coach.png)
+
+- **With a model on your computer, no key**: on desktop, *Find local models* lists the chat models in Ollama or LM Studio and starts with one click.
+- **With your own API key**: Gemini, OpenAI, Claude or OpenRouter. Your provider may charge for usage.
 
 ## Habitude app, web, and planned paid services
 
