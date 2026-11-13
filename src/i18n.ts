@@ -6,6 +6,8 @@
 // The locale is detected from Obsidian's own UI language setting; there is
 // no per-plugin language switch.
 
+import { getLanguage } from 'obsidian';
+
 export type UiLocale = 'en' | 'ko';
 
 type Dict = Record<string, string>;
@@ -58,6 +60,8 @@ const en: Dict = {
 	'settings.dataFolder.name': 'Data folder',
 	'settings.dataFolder.desc': 'Vault folder for Habits.md and daily Log notes.',
 	'settings.dataFolder.placeholder': 'Habitude',
+	'settings.dataFolder.invalid':
+		'Data folder must be a relative vault path without .. or illegal characters.',
 	'settings.weekStart.name': 'Week starts on',
 	'settings.weekStart.desc': 'First day of the week in the checklist grid.',
 	'settings.weekStart.monday': 'Monday',
@@ -84,6 +88,8 @@ const en: Dict = {
 	'settings.llmKey.emptyPlaceholder': 'Paste key to enable the AI coach',
 	'settings.llmModel.name': 'Coach model',
 	'settings.llmModel.desc': 'Model ID used by the AI coach. Empty uses the provider default.',
+	'settings.llmModel.invalid':
+		'Model ID cannot exceed 200 characters or contain control characters.',
 	'settings.baseUrl.name': 'API base URL',
 	'settings.baseUrl.desc': 'Optional override for the provider endpoint. Empty uses the provider default.',
 	'settings.baseUrl.requiredDesc':
@@ -104,18 +110,25 @@ const en: Dict = {
 	'settings.companionExplore.button': 'Explore Habitude',
 
 	// Habitude companion overview (local; outbound navigation is explicit)
-	'companion.card.start.title': 'Explore Habitude beyond Obsidian',
-	'companion.card.start.body': 'Learn about Habitude on the web and planned Sync and Plus options. Your checklist stays free.',
-	'companion.card.review.title': 'Take your review further',
-	'companion.card.review.body': 'Explore planned cross-device sync and deeper AI analysis. Your local weekly review stays free.',
-	'companion.card.coach.title': 'Explore plans for coaching',
-	'companion.card.coach.body': 'Preview the planned Plus option with included AI credits, alongside your existing provider setup.',
-	'companion.card.explore': 'Explore Habitude',
+	'companion.card.restart.title': 'Your {days}-day run of {title} paused',
+	'companion.card.restart.body': 'How did you get going again last time? Habitude is being built to answer that from your own notes.',
+	'companion.card.review.title': 'After the numbers comes "why"',
+	'companion.card.review.body': 'Why a week went well or badly is in what you wrote. Habitude is being built to answer that from your own notes.',
+	'companion.card.coach.title': 'Want answers from your notes, not only your stats?',
+	'companion.card.coach.body': 'This coach sees your habit statistics. In the Habitude app, Habi is being built to answer on your Mac from your own notes. A link to the AI you already use is planned too.',
+	'companion.card.explore': 'See what Habitude does',
 	'companion.card.dismiss': 'Hide app suggestions',
 	'companion.card.dismissAria': 'Hide all app suggestions. Restore them in Habitude settings.',
 	'companion.savePreferenceFailed': 'Could not save this preference. Please try again.',
-	'companion.title': 'Habitude beyond Obsidian',
-	'companion.intro': 'Keep building your routine here, and explore Habitude on the web when you are ready.',
+	'companion.title': 'Habitude: talk with your own records',
+	'companion.intro': 'Keep checking off habits here. When you start asking why, Habitude picks up from there.',
+	'companion.does.title': 'What Habitude does',
+	'companion.does.web.title': 'Journal and habits together',
+	'companion.does.web.body': 'Write on the web and see your habits beside your days.',
+	'companion.does.habi.title': 'Habi: you, answering from your records',
+	'companion.does.habi.body': 'Ask "how did I get going again last time?" and Habi looks through your vault and journal. Being built for the Mac and iPad apps, where it runs on the device.',
+	'companion.does.agent.title': 'A link to the AI you already use',
+	'companion.does.agent.body': 'Lets an AI such as Claude or ChatGPT look up only the records a question needs. When you use it, those excerpts go to the AI provider you chose.',
 	'companion.current.title': 'Your plugin stays free',
 	'companion.current.body': 'Checklists, streaks, graphs, weekly reviews, and coaching with your own provider remain available. AI provider usage may have its own costs.',
 	'companion.plans.title': 'Preview planned options',
@@ -153,30 +166,36 @@ const en: Dict = {
 	'checklist.newHabitPlaceholder': 'New habit… (enter to add)',
 	'checklist.add': 'Add',
 	'checklist.habitAdded': 'Habit added: {title}',
-	'checklist.emptyTitle': 'No habits yet.',
-	'checklist.emptyHint': 'Add your first habit above — e.g. "morning run".',
+	'checklist.emptyTitle': 'Pick your first habit',
+	'checklist.emptyHint': 'Tap one to start, or type your own above. It is saved as Markdown in your vault.',
+	'checklist.starterAria': 'Add habit: {title}',
+	'checklist.thisWeek': 'This week',
+	'checklist.today.count': 'Today: {done} of {total} done',
+	'checklist.today.ask': 'Did you do "{title}" today?',
+	'checklist.today.done': 'Done',
+	'checklist.today.allDone': 'All done for today.',
 	'checklist.habitOptions': 'Habit options',
 	'checklist.archiveHabit': 'Archive habit',
 	'checklist.habitArchived': 'Habit archived: {title}',
+	'checklist.addHabitFailed': 'Could not add the habit.',
+	'checklist.archiveHabitFailed': 'Could not archive the habit.',
 	'checklist.saveCheckFailed': 'Could not save the check.',
 	'checklist.progress': 'Progress',
 	'checklist.shareProgress': '📤 Share progress',
 	'checklist.shareNote':
 		'Sharing runs only when you tap the button. Only aggregate stats — habit titles, streaks, completion rates — are sent; your note contents are never included.',
-	'checklist.getCoaching': '✨ Get AI coaching',
 	'checklist.footnote':
 		'Tracking stays in your vault as Markdown. Sharing and AI coaching send data only when you use them.',
 	'checklist.toggleAria': '{title} on {date}',
 
 	// Coach view
-	'coach.setupTitle': 'AI coach — bring your own key',
+	'coach.setupTitle': 'AI coach',
 	'coach.setupDesc':
 		'Pick an AI provider and chat with a coach that knows your habits — your streaks, weekly rates, and weak days are shared with the model automatically as statistics.',
-	'coach.setupStep1Prefix': 'Get a free key at ',
-	'coach.setupStep1Link': 'Google AI Studio',
-	'coach.setupStep1Suffix': '.',
-	'coach.setupStep2':
-		'Paste it below. It stays on this device — it is only ever sent to Google, never to Habitude.',
+	'coach.setupNeedsBaseUrl':
+		'Enter the base URL for your custom OpenAI-compatible endpoint.',
+	'coach.setupNeedsModel':
+		'Enter the model ID to request from your custom endpoint.',
 	'coach.keyPlaceholder': 'Paste API key',
 	'coach.saveKey': 'Save & start',
 	'coach.pasteKeyFirst': 'Paste your API key first.',
@@ -192,6 +211,16 @@ const en: Dict = {
 	'coach.thinking': 'Coach is thinking…',
 	'coach.genericError': 'Something went wrong. Please try again.',
 	'coach.fallbackGreeting': "Hi, I'm your Habitude Coach. What's on your mind?",
+	'coach.local.title': 'Use a model on this computer',
+	'coach.local.desc':
+		'No API key needed. Works with Ollama or LM Studio running on this computer, so your habit statistics and messages stay on it.',
+	'coach.local.find': 'Find local models',
+	'coach.local.finding': 'Looking…',
+	'coach.local.none': 'No local model found.',
+	'coach.local.howto':
+		'Install Ollama or LM Studio, download a chat model, keep it running, then try again.',
+	'coach.local.useAria': 'Start the coach with {name}',
+	'coach.byok.title': 'Or connect a provider with your own API key',
 
 	// Weekly review modal
 	'review.title': 'Weekly review',
@@ -217,6 +246,8 @@ const en: Dict = {
 	'coach.error.emptyReply': 'The model returned an empty reply. Please try again.',
 	'coach.error.baseUrlRequired':
 		'Set a base URL for the custom provider in Settings → Habitude checklist.',
+	'coach.error.baseUrlInvalid':
+		'Enter a valid base URL using https:// (or http:// for localhost).',
 	'coach.error.modelRequired':
 		'Set a model ID for the custom provider in Settings → Habitude checklist.',
 
@@ -272,6 +303,8 @@ const ko: Dict = {
 	'settings.dataFolder.name': '데이터 폴더',
 	'settings.dataFolder.desc': 'Habits.md와 일별 Log 노트가 저장되는 볼트 폴더.',
 	'settings.dataFolder.placeholder': 'Habitude',
+	'settings.dataFolder.invalid':
+		'데이터 폴더는 ..이나 사용할 수 없는 문자가 없는 볼트 상대 경로여야 합니다.',
 	'settings.weekStart.name': '주 시작 요일',
 	'settings.weekStart.desc': '체크리스트 그리드에서 한 주의 시작 요일.',
 	'settings.weekStart.monday': '월요일',
@@ -296,6 +329,8 @@ const ko: Dict = {
 	'settings.llmKey.emptyPlaceholder': 'AI 코치를 켜려면 키를 붙여넣으세요',
 	'settings.llmModel.name': '코치 모델',
 	'settings.llmModel.desc': 'AI 코치가 사용하는 모델 ID. 비워 두면 제공자 기본값을 사용합니다.',
+	'settings.llmModel.invalid':
+		'모델 ID는 200자를 넘거나 제어 문자를 포함할 수 없습니다.',
 	'settings.baseUrl.name': 'API Base URL',
 	'settings.baseUrl.desc': '제공자 엔드포인트 재정의(선택). 비워 두면 제공자 기본값을 사용합니다.',
 	'settings.baseUrl.requiredDesc': '사용자 지정 제공자는 필수 — OpenAI 호환 엔드포인트의 Base URL을 입력하세요.',
@@ -315,18 +350,25 @@ const ko: Dict = {
 	'settings.companionExplore.button': 'Habitude 둘러보기',
 
 	// Habitude companion overview (local; outbound navigation is explicit)
-	'companion.card.start.title': 'Obsidian 밖의 Habitude도 둘러보세요',
-	'companion.card.start.body': 'Habitude 웹과 준비 중인 Sync, Plus를 알아보세요. 체크리스트는 계속 무료입니다.',
-	'companion.card.review.title': '주간 리뷰, 그다음이 궁금하다면',
-	'companion.card.review.body': '기기 간 동기화와 AI 심층 분석 계획을 살펴보세요. 로컬 주간 리뷰는 계속 무료입니다.',
-	'companion.card.coach.title': '코칭 요금제 계획을 살펴보세요',
-	'companion.card.coach.body': '기존 AI 제공자 설정과 함께, AI 크레딧이 포함될 Plus 계획도 확인할 수 있습니다.',
-	'companion.card.explore': 'Habitude 둘러보기',
+	'companion.card.restart.title': '{days}일 이어지던 {title}, 잠시 멈췄어요',
+	'companion.card.restart.body': '지난번엔 어떻게 다시 시작했을까요? Habitude는 이런 질문에 내 기록으로 답하도록 만들고 있습니다.',
+	'companion.card.review.title': '숫자 다음은 "왜"입니다',
+	'companion.card.review.body': '잘 된 주와 안 된 주의 이유는 내가 쓴 글 속에 있습니다. Habitude는 그 질문에 내 기록으로 답하도록 만들고 있습니다.',
+	'companion.card.coach.title': '통계 말고 내 기록으로 답을 듣고 싶다면',
+	'companion.card.coach.body': '이 코치는 습관 통계만 봅니다. Habitude 앱의 하비는 Mac 안에서 내 기록으로 답하도록 만들고 있습니다. 이미 쓰는 AI와 잇는 연결도 준비 중입니다.',
+	'companion.card.explore': 'Habitude가 하는 일 보기',
 	'companion.card.dismiss': '앱 안내 모두 숨기기',
 	'companion.card.dismissAria': '앱 안내를 모두 숨깁니다. Habitude 설정에서 다시 켤 수 있습니다.',
 	'companion.savePreferenceFailed': '안내 설정을 저장하지 못했습니다. 다시 시도하세요.',
-	'companion.title': 'Obsidian 밖의 Habitude',
-	'companion.intro': '이곳에서 루틴을 계속 쌓고, 원할 때 Habitude 웹도 둘러보세요.',
+	'companion.title': '내 기록과 대화하는 Habitude',
+	'companion.intro': '체크는 여기서 계속하세요. "왜"가 궁금해질 때 Habitude가 이어받습니다.',
+	'companion.does.title': 'Habitude가 하는 일',
+	'companion.does.web.title': '일기와 습관을 한곳에서',
+	'companion.does.web.body': '웹에서 일기를 쓰고, 습관을 그날의 기록 옆에서 봅니다.',
+	'companion.does.habi.title': '하비: 내 기록으로 답하는 나',
+	'companion.does.habi.body': '"지난번엔 어떻게 다시 시작했지?"라고 물으면 내 볼트와 일기에서 찾아 답합니다. Mac·iPad 앱에서 기기 안에서 동작하도록 만들고 있습니다.',
+	'companion.does.agent.title': '쓰던 AI와 잇기',
+	'companion.does.agent.body': 'Claude, ChatGPT 같은 AI가 질문에 필요한 기록만 찾아보게 합니다. 사용하면 그 발췌가 내가 고른 AI 제공자에게 전송됩니다.',
 	'companion.current.title': '플러그인은 계속 무료입니다',
 	'companion.current.body': '체크리스트, 스트릭, 그래프, 주간 리뷰, 본인 AI 제공자를 사용하는 코칭을 계속 이용할 수 있습니다. AI 제공자 사용료는 별도로 발생할 수 있습니다.',
 	'companion.plans.title': '준비 중인 요금제 미리 보기',
@@ -364,30 +406,34 @@ const ko: Dict = {
 	'checklist.newHabitPlaceholder': '새 습관… (엔터로 추가)',
 	'checklist.add': '추가',
 	'checklist.habitAdded': '습관 추가됨: {title}',
-	'checklist.emptyTitle': '습관이 아직 없습니다.',
-	'checklist.emptyHint': '위에서 첫 습관을 추가하세요. 예: "아침 러닝".',
+	'checklist.emptyTitle': '첫 습관을 정해 보세요',
+	'checklist.emptyHint': '하나를 눌러 시작하거나, 위에 직접 입력하세요. 볼트 안에 Markdown으로 저장됩니다.',
+	'checklist.starterAria': '습관 추가: {title}',
+	'checklist.thisWeek': '이번 주',
+	'checklist.today.count': '오늘 {total}개 중 {done}개 완료',
+	'checklist.today.ask': '오늘 {title}{particle} 했나요?',
+	'checklist.today.done': '했어요',
+	'checklist.today.allDone': '오늘 습관을 모두 했어요.',
 	'checklist.habitOptions': '습관 옵션',
 	'checklist.archiveHabit': '습관 보관',
 	'checklist.habitArchived': '습관 보관됨: {title}',
+	'checklist.addHabitFailed': '습관을 추가할 수 없습니다.',
+	'checklist.archiveHabitFailed': '습관을 보관할 수 없습니다.',
 	'checklist.saveCheckFailed': '체크를 저장할 수 없습니다.',
 	'checklist.progress': '진행 상황',
 	'checklist.shareProgress': '📤 진행 상황 공유',
 	'checklist.shareNote':
 		'공유하기는 사용자가 직접 누를 때만 동작하며, 전송되는 데이터는 습관 제목·스트릭·완료율 같은 집계 통계뿐이고 노트 내용은 포함되지 않습니다.',
-	'checklist.getCoaching': '✨ AI 코칭 받기',
 	'checklist.footnote':
 		'습관 기록은 볼트 안에 Markdown으로 보관됩니다. 공유와 AI 코칭은 직접 사용할 때만 데이터를 전송합니다.',
 	'checklist.toggleAria': '{date}의 {title}',
 
 	// Coach view
-	'coach.setupTitle': 'AI 코치 — 본인 키로 사용',
+	'coach.setupTitle': 'AI 코치',
 	'coach.setupDesc':
 		'AI 제공자를 선택하고 습관을 아는 코치와 대화하세요. 스트릭, 주간 완료율, 약한 요일 같은 통계가 모델에 자동으로 전달됩니다.',
-	'coach.setupStep1Prefix': '',
-	'coach.setupStep1Link': 'Google AI Studio',
-	'coach.setupStep1Suffix': '에서 무료 키를 받으세요.',
-	'coach.setupStep2':
-		'아래에 붙여넣으세요. 이 기기에만 보관되며, Google에만 전송되고 Habitude로는 절대 전송되지 않습니다.',
+	'coach.setupNeedsBaseUrl': '사용자 지정 OpenAI 호환 엔드포인트의 Base URL을 입력하세요.',
+	'coach.setupNeedsModel': '사용자 지정 엔드포인트에 요청할 모델 ID를 입력하세요.',
 	'coach.keyPlaceholder': 'API 키 붙여넣기',
 	'coach.saveKey': '저장하고 시작',
 	'coach.pasteKeyFirst': '먼저 API 키를 붙여넣으세요.',
@@ -403,6 +449,15 @@ const ko: Dict = {
 	'coach.thinking': '코치가 생각 중…',
 	'coach.genericError': '문제가 발생했습니다. 다시 시도하세요.',
 	'coach.fallbackGreeting': '안녕하세요, Habitude 코치입니다. 무슨 고민이 있으세요?',
+	'coach.local.title': '이 컴퓨터의 모델 사용',
+	'coach.local.desc':
+		'API 키가 필요 없습니다. 이 컴퓨터에서 실행 중인 Ollama나 LM Studio를 쓰므로, 습관 통계와 대화가 이 컴퓨터 밖으로 나가지 않습니다.',
+	'coach.local.find': '로컬 모델 찾기',
+	'coach.local.finding': '찾는 중…',
+	'coach.local.none': '로컬 모델을 찾지 못했습니다.',
+	'coach.local.howto': 'Ollama나 LM Studio를 설치하고 대화용 모델을 받은 뒤, 실행해 둔 상태에서 다시 시도하세요.',
+	'coach.local.useAria': '{name}(으)로 코치 시작',
+	'coach.byok.title': '또는 본인 API 키로 연결',
 
 	// Weekly review modal
 	'review.title': '주간 리뷰',
@@ -427,6 +482,7 @@ const ko: Dict = {
 	'coach.error.modelError': '모델 오류: {detail}',
 	'coach.error.emptyReply': '모델이 빈 응답을 반환했습니다. 다시 시도하세요.',
 	'coach.error.baseUrlRequired': '설정 → Habitude checklist에서 사용자 지정 제공자의 Base URL을 입력하세요.',
+	'coach.error.baseUrlInvalid': 'https://(로컬은 http:// 가능)로 시작하는 올바른 Base URL을 입력하세요.',
 	'coach.error.modelRequired': '설정 → Habitude checklist에서 사용자 지정 제공자의 모델 ID를 입력하세요.',
 
 	// Date labels
@@ -449,23 +505,14 @@ export function clearUiLocale(): void {
 
 /**
  * Detect the UI locale from Obsidian's own language setting via the
- * getLanguage() API. Never throws: the API may be absent (node tests)
- * or access-restricted. Uses window for popout window compatibility
- * per the community review guidelines.
+ * exported getLanguage() API, which also works in popout windows.
+ * An unavailable or failing API falls back to English.
  */
 export function getUiLocale(): UiLocale {
 	if (override) return override;
 	try {
-		// getLanguage() is exposed on window by the Obsidian runtime.
-		const w =
-			typeof window === 'undefined'
-				? undefined
-				: (window as unknown as { getLanguage?: unknown });
-		const getLang = w?.getLanguage;
-		if (typeof getLang === 'function') {
-			const lang = (getLang as () => string)();
-			if (lang && lang.toLowerCase().startsWith('ko')) return 'ko';
-		}
+		const lang = getLanguage();
+		if (typeof lang === 'string' && lang.toLowerCase().startsWith('ko')) return 'ko';
 	} catch {
 		// Absent or unreadable — fall through to English.
 	}

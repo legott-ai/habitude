@@ -1,11 +1,20 @@
 // Plugin entry point: lifecycle only. Feature logic lives in commands/, ui/,
 // store.ts, stats.ts and settings.ts.
 
-import { Notice, Plugin } from 'obsidian';
+import { normalizePath, Notice, Plugin } from 'obsidian';
 import { t } from './i18n';
 import { DEFAULT_SETTINGS, HabitudeSettingTab, type PluginSettings } from './settings';
-import { normalizeCheckmarkColor } from './types';
-import { DEFAULT_COACH_MODEL, getProvider } from './coach/providers';
+import {
+	normalizeCheckmarkColor,
+	normalizeCoachLanguage,
+	normalizeLlmApiKey,
+	normalizeLlmBaseUrl,
+	normalizeLlmModel,
+	normalizeLlmProvider,
+	normalizeVaultFolder,
+	normalizeWeekStart,
+} from './types';
+import { DEFAULT_COACH_MODEL } from './coach/providers';
 import { HabitStore } from './store';
 import { CHECKLIST_VIEW_TYPE, ChecklistView } from './ui/checklist-view';
 import { COACH_VIEW_TYPE, CoachView } from './ui/coach-view';
@@ -25,6 +34,7 @@ export default class HabitudePlugin extends Plugin {
 	settings!: PluginSettings;
 	private store: HabitStore | null = null;
 	private statusBarEl: HTMLElement | null = null;
+	private refreshTimer: ReturnType<typeof setTimeout> | number | undefined;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -36,10 +46,11 @@ export default class HabitudePlugin extends Plugin {
 				getCheckmarkColor: () => this.settings.checkmarkColor,
 				getPluginVersion: () => this.manifest.version,
 				getShowCompanionPrompts: () => this.settings.showCompanionPrompts,
-				getCoachConfigured: () => !getProvider(this.settings.llmProvider).needsKey
-					|| !!this.settings.llmApiKey.trim(),
 				onExploreCompanion: (entryPoint) => this.openCompanion(entryPoint),
 				onHideCompanionPrompts: () => this.hideCompanionPrompts(),
+				onStatusChange: () => {
+					void this.updateStatusBar();
+				},
 			}),
 		);
 
@@ -59,23 +70,60 @@ export default class HabitudePlugin extends Plugin {
 		registerCommands(this);
 		this.addSettingTab(new HabitudeSettingTab(this.app, this));
 
-		// Re-render open views + status bar when markdown data changes on disk
-		// (including edits the user makes by hand in Habits.md / Log notes).
-		// Debounced to avoid render storms during sync.
-		let timer: number | undefined;
+		// Re-render open views + status bar when markdown data in the configured
+		// Habitude folder changes on disk (edits, sync creates/deletes/renames).
+		// Unrelated vault notes are ignored; debounced to avoid render storms.
 		this.registerEvent(
-			this.app.vault.on('modify', () => {
-				if (timer !== undefined) window.clearTimeout(timer);
-				timer = window.setTimeout(() => {
-					this.refreshViews();
-					void this.updateStatusBar();
-				}, 400);
+			this.app.vault.on('modify', (file) => {
+				if (this.isHabitVaultPath(file.path)) this.scheduleVaultRefresh();
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('create', (file) => {
+				if (this.isHabitVaultPath(file.path)) this.scheduleVaultRefresh();
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				if (this.isHabitVaultPath(file.path)) this.scheduleVaultRefresh();
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				if (this.isHabitVaultPath(file.path) || this.isHabitVaultPath(oldPath)) {
+					this.scheduleVaultRefresh();
+				}
 			}),
 		);
 	}
 
 	onunload(): void {
-		// Views and listeners are cleaned up by Obsidian via registerView/registerEvent.
+		this.clearRefreshTimer();
+	}
+
+	private isHabitVaultPath(path: string): boolean {
+		const folder = normalizePath(this.settings.dataFolder);
+		const normalized = normalizePath(path);
+		return normalized === folder || normalized.startsWith(`${folder}/`);
+	}
+
+	private clearRefreshTimer(): void {
+		if (this.refreshTimer === undefined) return;
+		const cancelTimeout =
+			typeof window !== 'undefined' ? window.clearTimeout.bind(window) : clearTimeout;
+		cancelTimeout(this.refreshTimer as never);
+		this.refreshTimer = undefined;
+	}
+
+	private scheduleVaultRefresh(): void {
+		this.clearRefreshTimer();
+		const scheduleTimeout =
+			typeof window !== 'undefined' ? window.setTimeout.bind(window) : setTimeout;
+		this.refreshTimer = scheduleTimeout(() => {
+			this.refreshTimer = undefined;
+			this.refreshViews();
+			void this.updateStatusBar();
+		}, 400);
 	}
 
 	async activateView(): Promise<void> {
@@ -169,7 +217,7 @@ export default class HabitudePlugin extends Plugin {
 		}
 	}
 
-	private async updateStatusBar(): Promise<void> {
+	async updateStatusBar(): Promise<void> {
 		if (!this.statusBarEl) return;
 		try {
 			const store = this.getStore();
@@ -192,19 +240,27 @@ export default class HabitudePlugin extends Plugin {
 		// PluginSettings/DEFAULT_SETTINGS.
 		const raw = ((await this.loadData()) ?? {}) as Partial<PluginSettings> & LegacySettings;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, raw);
+		this.settings.dataFolder = normalizeVaultFolder(this.settings.dataFolder);
+		this.settings.weekStart = normalizeWeekStart(this.settings.weekStart);
 		// New setting: users without it (pre-checkmark-color versions) inherit
 		// the white default via Object.assign; invalid values are normalized
 		// so the check mark can never render with a broken color.
 		this.settings.checkmarkColor = normalizeCheckmarkColor(this.settings.checkmarkColor);
 		this.settings.showCompanionPrompts = normalizeCompanionPrompts(this.settings.showCompanionPrompts);
+		this.settings.llmProvider = normalizeLlmProvider(this.settings.llmProvider);
+		this.settings.llmApiKey = normalizeLlmApiKey(this.settings.llmApiKey);
+		this.settings.llmModel = normalizeLlmModel(this.settings.llmModel);
+		this.settings.llmBaseUrl = normalizeLlmBaseUrl(this.settings.llmBaseUrl);
+		this.settings.coachLanguage = normalizeCoachLanguage(this.settings.coachLanguage);
 		// One-time migration: legacy geminiApiKey/coachModel → provider-neutral
-		// llm* settings. Only runs when the new key is empty and a legacy key
-		// exists, so existing users keep their coach working after the update.
+		// llm* settings. Only runs when the new key is empty and a non-empty
+		// legacy key exists, so existing users keep their coach working.
 		let migrated = false;
-		if (!this.settings.llmApiKey && raw.geminiApiKey) {
+		const legacyKey = normalizeLlmApiKey(raw.geminiApiKey);
+		if (!this.settings.llmApiKey && legacyKey) {
 			this.settings.llmProvider = 'gemini';
-			this.settings.llmApiKey = raw.geminiApiKey;
-			this.settings.llmModel = raw.coachModel || DEFAULT_COACH_MODEL;
+			this.settings.llmApiKey = legacyKey;
+			this.settings.llmModel = normalizeLlmModel(raw.coachModel) || DEFAULT_COACH_MODEL;
 			migrated = true;
 		}
 		// Purge legacy keys from stored data: this.settings was rebuilt from

@@ -151,7 +151,9 @@ export interface ShareDeps {
 export type ShareOutcome = { ok: true; url: string } | { ok: false };
 
 async function defaultPost(url: string, body: string): Promise<SharePostResult> {
-	let timer: number | undefined;
+	const scheduleTimeout = typeof window !== 'undefined' ? window.setTimeout.bind(window) : setTimeout;
+	const cancelTimeout = typeof window !== 'undefined' ? window.clearTimeout.bind(window) : clearTimeout;
+	let timer: ReturnType<typeof setTimeout> | number | undefined;
 	try {
 		const res = await Promise.race([
 			requestUrl({
@@ -162,7 +164,7 @@ async function defaultPost(url: string, body: string): Promise<SharePostResult> 
 				throw: false,
 			}),
 			new Promise<never>((_, reject) => {
-				timer = window.setTimeout(() => reject(new Error('share timeout')), SHARE_TIMEOUT_MS);
+				timer = scheduleTimeout(() => reject(new Error('share timeout')), SHARE_TIMEOUT_MS);
 			}),
 		]);
 		return {
@@ -170,7 +172,7 @@ async function defaultPost(url: string, body: string): Promise<SharePostResult> 
 			json: () => Promise.resolve(res.json as unknown),
 		};
 	} finally {
-		if (timer !== undefined) window.clearTimeout(timer);
+		if (timer !== undefined) cancelTimeout(timer as never);
 	}
 }
 

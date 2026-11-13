@@ -9,15 +9,14 @@
 
 import { requestUrl } from 'obsidian';
 import { t } from '../i18n';
+import {
+	isValidBaseUrl,
+	isValidLlmModel,
+	LLM_PROVIDER_IDS,
+	type LlmProviderId,
+} from '../types';
 
-export type LlmProviderId =
-	| 'gemini'
-	| 'openai'
-	| 'anthropic'
-	| 'openrouter'
-	| 'ollama'
-	| 'lmstudio'
-	| 'custom';
+export { isValidBaseUrl, LLM_PROVIDER_IDS, type LlmProviderId };
 
 /** Default Gemini model id; also the fallback when migrating legacy settings. */
 export const DEFAULT_COACH_MODEL = 'gemini-2.5-flash';
@@ -69,6 +68,40 @@ export interface ProviderDef {
 	buildRequest: (args: BuildRequestArgs) => BuiltRequest;
 	/** Extract the assistant text from a raw response body (JSON text). */
 	parseResponse: (raw: string) => string;
+}
+
+export type CoachConfigProblem = 'key' | 'baseUrl' | 'model';
+
+export interface CoachConfigInput {
+	llmProvider: LlmProviderId;
+	llmApiKey: string;
+	llmBaseUrl: string;
+	llmModel: string;
+}
+
+/**
+ * Setup pieces still missing or invalid before the coach can send a message.
+ * Prevents the custom provider (which has no default base URL or model) from
+ * landing in an unconfigured chat screen and failing only at send time.
+ */
+export function coachConfigProblems(settings: CoachConfigInput): CoachConfigProblem[] {
+	const def = getProvider(settings.llmProvider);
+	const problems: CoachConfigProblem[] = [];
+	if (def.needsKey && !settings.llmApiKey.trim()) {
+		problems.push('key');
+	}
+	const trimmedBase = settings.llmBaseUrl.trim();
+	if (def.id === 'custom') {
+		if (!isValidBaseUrl(trimmedBase)) {
+			problems.push('baseUrl');
+		}
+		if (!settings.llmModel.trim() || !isValidLlmModel(settings.llmModel)) {
+			problems.push('model');
+		}
+	} else if (trimmedBase !== '' && !isValidBaseUrl(trimmedBase)) {
+		problems.push('baseUrl');
+	}
+	return problems;
 }
 
 /**
@@ -289,67 +322,124 @@ const PROVIDERS: Record<LlmProviderId, ProviderDef> = {
 	custom: customProvider,
 };
 
-export const LLM_PROVIDER_IDS: LlmProviderId[] = [
-	'gemini',
-	'openai',
-	'anthropic',
-	'openrouter',
-	'ollama',
-	'lmstudio',
-	'custom',
-];
-
 /** Unknown ids fall back to Gemini (the historical default). */
 export function getProvider(id: string): ProviderDef {
 	return (PROVIDERS as Record<string, ProviderDef>)[id] ?? PROVIDERS.gemini;
 }
 
-function classifyTransportError(e: unknown, providerLabel: string): CoachError {
-	// Obsidian's requestUrl REJECTS on HTTP 4xx/5xx with the status on the
-	// error — classify those instead of blaming the connection.
-	const status =
-		typeof (e as { status?: unknown } | null | undefined)?.status === 'number'
-			? (e as { status: number }).status
-			: 0;
-	if (status === 400 || status === 401 || status === 403) {
-		return new CoachError('auth', t('coach.error.authRejected'));
+const AUTH_MESSAGE_PATTERN =
+	/\b(api[-_ ]?key|x-api-key|x-goog-api-key|auth(?:entication|orization)?|unauthenticated|unauthorized|invalid[-_ ]key|bearer)\b/i;
+
+const AUTH_CODE_SET = new Set([
+	'authentication_error',
+	'invalid_api_key',
+	'invalid x-api-key',
+	'api_key_invalid',
+	'unauthenticated',
+	'unauthorized',
+]);
+
+interface ExtractedError {
+	code: number | null;
+	codeStr: string;
+	message: string;
+}
+
+function extractErrorInfo(data: unknown): ExtractedError | null {
+	if (!data || typeof data !== 'object' || !('error' in data)) return null;
+	const rawErr = (data as { error?: unknown }).error;
+	if (!rawErr) return null;
+	if (typeof rawErr === 'string') {
+		return { code: null, codeStr: '', message: rawErr };
 	}
-	if (status === 429) {
+	if (typeof rawErr !== 'object') return null;
+	const err = rawErr as { code?: unknown; message?: unknown; type?: unknown; status?: unknown };
+	const code = typeof err.code === 'number' ? err.code : null;
+	const message = typeof err.message === 'string' ? err.message : 'Unknown error';
+	const tag =
+		typeof err.code === 'string'
+			? err.code
+			: typeof err.type === 'string'
+				? err.type
+				: typeof err.status === 'string'
+					? err.status
+					: '';
+	return { code, codeStr: tag.toLowerCase(), message };
+}
+
+function isAuthErrorPayload(httpStatus: number, info: ExtractedError | null, rawText: string): boolean {
+	if (httpStatus === 401 || httpStatus === 403) return true;
+	if (info && (info.code === 401 || info.code === 403 || AUTH_CODE_SET.has(info.codeStr))) {
+		return true;
+	}
+	// HTTP 400 (e.g. Gemini's INVALID_ARGUMENT on bad keys) is only classified
+	// as auth when the error payload/message explicitly mentions API keys or
+	// authentication — never on bad model IDs, malformed prompts, or Ollama 400s.
+	if (httpStatus === 400 || info?.code === 400) {
+		const candidate = info ? `${info.message} ${info.codeStr} ${rawText}` : rawText;
+		return AUTH_MESSAGE_PATTERN.test(candidate);
+	}
+	return false;
+}
+
+function classifyHttpOrBodyError(
+	httpStatus: number,
+	parsedBody: unknown,
+	rawText: string,
+	providerLabel: string,
+): CoachError {
+	const info = extractErrorInfo(parsedBody);
+	if (isAuthErrorPayload(httpStatus, info, rawText)) {
+		const isInvalidCode = httpStatus === 401 || httpStatus === 403 || info?.code === 401 || info?.code === 403;
+		return new CoachError('auth', isInvalidCode ? t('coach.error.authInvalid') : t('coach.error.authRejected'));
+	}
+	if (
+		httpStatus === 429 ||
+		info?.code === 429 ||
+		info?.codeStr === 'rate_limit_error' ||
+		info?.codeStr === 'resource_exhausted'
+	) {
 		return new CoachError('quota', t('coach.error.rateLimit'));
 	}
+	if (info) {
+		return new CoachError('api', t('coach.error.modelError', { detail: info.message }));
+	}
+	return new CoachError('api', t('coach.error.httpError', { provider: providerLabel, status: httpStatus }));
+}
+
+function parseJsonSafe(raw: string): { ok: true; value: unknown } | { ok: false } {
+	try {
+		return { ok: true, value: JSON.parse(raw) as unknown };
+	} catch {
+		return { ok: false };
+	}
+}
+
+function classifyTransportError(e: unknown, providerLabel: string): CoachError {
+	// With `throw: false`, Obsidian's requestUrl resolves on HTTP 4xx/5xx,
+	// while custom/mocked transports in tests may still reject with `{ status, json, text }`.
+	const errObj = e as { status?: unknown; json?: unknown; text?: unknown; message?: unknown } | null | undefined;
+	const status = typeof errObj?.status === 'number' ? errObj.status : 0;
 	if (status >= 400) {
-		return new CoachError('api', t('coach.error.httpError', { provider: providerLabel, status }));
+		const rawText =
+			typeof errObj?.text === 'string'
+				? errObj.text
+				: typeof errObj?.message === 'string'
+					? errObj.message
+					: '';
+		let parsedBody: unknown = errObj?.json;
+		if (parsedBody === undefined && rawText) {
+			const parsed = parseJsonSafe(rawText);
+			if (parsed.ok) parsedBody = parsed.value;
+		}
+		return classifyHttpOrBodyError(status, parsedBody, rawText, providerLabel);
 	}
 	return new CoachError('network', t('coach.error.network', { detail: String(e) }));
 }
 
-interface ErrorBody {
-	error?: { code?: unknown; message?: unknown; type?: unknown };
-}
-
-function classifyBodyError(data: ErrorBody, providerLabel: string): CoachError {
-	const err = data.error ?? {};
-	const code = err.code;
-	const msg = typeof err.message === 'string' ? err.message : 'Unknown error';
-	const typeTag = typeof err.type === 'string' ? err.type : '';
-	const codeStr = (typeof code === 'string' || typeof code === 'number' ? String(code) : typeTag).toLowerCase();
-	if (
-		(code === 400 && /api key/i.test(msg)) ||
-		code === 401 ||
-		code === 403 ||
-		codeStr === 'authentication_error' ||
-		codeStr === 'invalid_api_key' ||
-		codeStr === 'invalid x-api-key'
-	) {
-		throw new CoachError('auth', code === 401 || code === 403 ? t('coach.error.authInvalid') : t('coach.error.authRejected'));
-	}
-	if (code === 429 || codeStr === 'rate_limit_error') {
-		throw new CoachError('quota', t('coach.error.rateLimit'));
-	}
-	// Keep the provider label out of the generic model error: the detail
-	// usually names the provider already.
-	void providerLabel;
-	throw new CoachError('api', t('coach.error.modelError', { detail: msg }));
+function translateBaseUrlInvalid(): string {
+	const msg = t('coach.error.baseUrlInvalid');
+	return msg === 'coach.error.baseUrlInvalid' ? t('coach.error.baseUrlRequired') : msg;
 }
 
 export async function chatCompletion(
@@ -365,9 +455,16 @@ export async function chatCompletion(
 	requestFn: RequestFn = requestUrl,
 ): Promise<string> {
 	const def = getProvider(args.provider);
-	const resolvedBase = (args.baseUrl || '').trim() || def.defaultBaseUrl;
+	const baseOverride = (args.baseUrl || '').trim();
+	if (baseOverride && !isValidBaseUrl(baseOverride)) {
+		throw new CoachError('api', translateBaseUrlInvalid());
+	}
+	const resolvedBase = baseOverride || def.defaultBaseUrl;
 	if (!resolvedBase) {
 		throw new CoachError('api', t('coach.error.baseUrlRequired'));
+	}
+	if (!isValidBaseUrl(resolvedBase)) {
+		throw new CoachError('api', translateBaseUrlInvalid());
 	}
 	const model = (args.model || '').trim() || def.defaultModel;
 	if (!model) {
@@ -384,23 +481,47 @@ export async function chatCompletion(
 		message: args.message,
 	});
 
-	let raw: string;
+	let status = 200;
+	let raw = '';
+	let responseJson: unknown;
 	try {
-		const res = await requestFn({ url, method: 'POST', headers, body });
-		raw = res.text;
+		const res = (await requestFn({
+			url,
+			method: 'POST',
+			headers,
+			body,
+			throw: false,
+		})) as { status?: unknown; text?: unknown; json?: unknown };
+		if (typeof res.status === 'number') status = res.status;
+		if (typeof res.text === 'string') {
+			raw = res.text;
+		} else if (res.json !== undefined) {
+			responseJson = res.json;
+			raw = JSON.stringify(res.json);
+		}
+		if (responseJson === undefined && res.json !== undefined) {
+			responseJson = res.json;
+		}
 	} catch (e) {
 		throw classifyTransportError(e, def.label);
 	}
 
-	let data: unknown;
-	try {
-		data = JSON.parse(raw) as unknown;
-	} catch {
+	if (status >= 400) {
+		let parsedBody = responseJson;
+		if (parsedBody === undefined && raw) {
+			const parsed = parseJsonSafe(raw);
+			if (parsed.ok) parsedBody = parsed.value;
+		}
+		throw classifyHttpOrBodyError(status, parsedBody, raw, def.label);
+	}
+
+	const parsed = parseJsonSafe(raw);
+	if (!parsed.ok) {
 		throw new CoachError('api', t('coach.error.unreadable'));
 	}
 
-	if (data && typeof data === 'object' && 'error' in data && (data as ErrorBody).error) {
-		throw classifyBodyError(data as ErrorBody, def.label);
+	if (extractErrorInfo(parsed.value)) {
+		throw classifyHttpOrBodyError(200, parsed.value, raw, def.label);
 	}
 
 	const text = def.parseResponse(raw);

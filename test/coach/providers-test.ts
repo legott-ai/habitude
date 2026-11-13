@@ -10,6 +10,7 @@
 
 import {
 	chatCompletion,
+	coachConfigProblems,
 	CoachError,
 	getProvider,
 	LLM_PROVIDER_IDS,
@@ -236,6 +237,94 @@ async function testErrorClassification(): Promise<void> {
 		() => chatCompletion({ ...base, provider: 'custom', baseUrl: 'https://proxy.example.com' }, bodyText(OPENAI_OK) as never),
 		'api',
 	);
+
+	// throw: false passed to requestFn, and HTTP 400 only classified as auth when payload mentions API key/auth.
+	let sawThrowFalse = false;
+	const statusTransport = (status: number, text: string) => async (opts: { throw?: boolean }) => {
+		if (opts.throw === false) sawThrowFalse = true;
+		return { status, text };
+	};
+	await expectKind(
+		'resolved 400 bad model → api (not auth)',
+		() =>
+			chatCompletion(
+				base,
+				statusTransport(400, JSON.stringify({ error: { code: 400, message: 'The model "gpt-99" does not exist' } })) as never,
+			),
+		'api',
+	);
+	check('requestFn called with throw: false', sawThrowFalse);
+
+	await expectKind(
+		'resolved 400 Ollama string error → api (not auth)',
+		() =>
+			chatCompletion(
+				{ ...base, provider: 'ollama', apiKey: '' },
+				statusTransport(400, JSON.stringify({ error: "model 'llama99' not found" })) as never,
+			),
+		'api',
+	);
+	await expectKind(
+		'resolved 400 invalid API key → auth',
+		() =>
+			chatCompletion(
+				{ ...base, provider: 'gemini' },
+				statusTransport(400, JSON.stringify({ error: { code: 400, message: 'API key not valid. Please pass a valid API key.' } })) as never,
+			),
+		'auth',
+	);
+	await expectKind(
+		'thrown 400 without key mention → api (not auth)',
+		viaClient(rejectWith(Object.assign(new Error('Request failed, status 400'), { status: 400 }))),
+		'api',
+	);
+	await expectKind(
+		'resolved 401 → auth',
+		() => chatCompletion(base, statusTransport(401, 'Unauthorized') as never),
+		'auth',
+	);
+	await expectKind(
+		'resolved 429 → quota',
+		() => chatCompletion(base, statusTransport(429, 'Too Many Requests') as never),
+		'quota',
+	);
+	await expectKind(
+		'resolved 503 → api',
+		() => chatCompletion(base, statusTransport(503, 'Service Unavailable') as never),
+		'api',
+	);
+}
+
+function testCoachConfigProblems(): void {
+	console.log('\n[P5] coachConfigProblems');
+	check(
+		'gemini without key needs key',
+		coachConfigProblems({ llmProvider: 'gemini', llmApiKey: '', llmBaseUrl: '', llmModel: '' }).join(',') === 'key',
+	);
+	check(
+		'gemini with key ready',
+		coachConfigProblems({ llmProvider: 'gemini', llmApiKey: 'k', llmBaseUrl: '', llmModel: '' }).length === 0,
+	);
+	check(
+		'ollama without key ready',
+		coachConfigProblems({ llmProvider: 'ollama', llmApiKey: '', llmBaseUrl: '', llmModel: '' }).length === 0,
+	);
+	check(
+		'custom empty needs baseUrl and model',
+		coachConfigProblems({ llmProvider: 'custom', llmApiKey: '', llmBaseUrl: '', llmModel: '' }).join(',') === 'baseUrl,model',
+	);
+	check(
+		'custom with baseUrl still needs model',
+		coachConfigProblems({ llmProvider: 'custom', llmApiKey: '', llmBaseUrl: 'http://localhost:8000/v1', llmModel: '' }).join(',') === 'model',
+	);
+	check(
+		'custom with baseUrl and model ready',
+		coachConfigProblems({ llmProvider: 'custom', llmApiKey: '', llmBaseUrl: 'http://localhost:8000/v1', llmModel: 'qwen2.5' }).length === 0,
+	);
+	check(
+		'invalid baseUrl flagged even on keyed provider',
+		coachConfigProblems({ llmProvider: 'openai', llmApiKey: 'k', llmBaseUrl: 'htp://bad', llmModel: '' }).join(',') === 'baseUrl',
+	);
 }
 
 async function testFallbackAndWindow(): Promise<void> {
@@ -268,6 +357,7 @@ async function main(): Promise<void> {
 	await testAnthropicNormalization();
 	await testErrorClassification();
 	await testFallbackAndWindow();
+	testCoachConfigProblems();
 	console.log(failures === 0 ? '\nALL PROVIDER TESTS PASSED' : `\n${failures} FAILURES`);
 	process.exit(failures === 0 ? 0 : 1);
 }

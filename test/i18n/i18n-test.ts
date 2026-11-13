@@ -1,7 +1,7 @@
 // Tests for the UI i18n layer (src/i18n.ts).
 //
-// Covers: locale auto-detection (incl. no-getLanguage and throwing
-// getLanguage), manual override, en/ko translation, {var} interpolation,
+// Covers: exported API auto-detection (without a window global and with a
+// conflicting window global), manual override, en/ko translation, {var} interpolation,
 // English fallback when a ko string is missing, and en/ko key parity.
 //
 // Build & run:
@@ -18,6 +18,7 @@ import {
 	UI_STRINGS,
 	type UiLocale,
 } from '../../src/i18n';
+import { setMockLanguageReader } from '../stress/mock-obsidian';
 
 let failures = 0;
 
@@ -31,22 +32,31 @@ function check(name: string, cond: boolean, extra = ''): void {
 }
 
 function stubGetLanguage(fn: () => string | null): void {
-	(globalThis as Record<string, unknown>).window = { getLanguage: fn };
+	setMockLanguageReader(fn);
 }
 
 function removeGetLanguage(): void {
 	delete (globalThis as Record<string, unknown>).window;
+	setMockLanguageReader(() => 'en');
 }
 
 function testDetection(): void {
 	console.log('detection');
 	removeGetLanguage();
 	clearUiLocale();
-	check('no getLanguage -> en', getUiLocale() === 'en');
+	check('API language=en without window -> en', getUiLocale() === 'en');
 
 	stubGetLanguage(() => 'ko');
 	clearUiLocale();
-	check('language=ko -> ko', getUiLocale() === 'ko');
+	check('API language=ko without window.getLanguage -> ko', getUiLocale() === 'ko');
+	check('API Korean localizes the actual checklist controls', t('checklist.weeklyReview') === '주간 리뷰' && t('checklist.add') === '추가');
+
+	(globalThis as Record<string, unknown>).window = { getLanguage: () => 'en' };
+	check('API ko wins over a conflicting window global', getUiLocale() === 'ko');
+	stubGetLanguage(() => 'en');
+	(globalThis as Record<string, unknown>).window = { getLanguage: () => 'ko' };
+	check('API en wins over a conflicting window global', getUiLocale() === 'en');
+	removeGetLanguage();
 
 	stubGetLanguage(() => 'ko-KR');
 	clearUiLocale();

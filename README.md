@@ -1,6 +1,6 @@
 # Habitude Checklist — Obsidian Plugin
 
-A 7-day habit checklist for Obsidian: add habits, tap days to check them off, track streaks and weekly completion rates, and open a weekly review. Markdown-native — your data lives in your vault as plain markdown.
+A 7-day habit checklist for Obsidian: add habits, check off today in one tap, track streaks and weekly completion rates, and open a weekly review. Everything in the checklist works without AI, an account or an API key. Markdown-native — your data lives in your vault as plain markdown.
 
 ## Screenshots
 
@@ -9,10 +9,6 @@ A 7-day habit checklist for Obsidian: add habits, tap days to check them off, tr
 *The 7-day checklist grid next to your plain-Markdown habit data. Click a cell to toggle — streaks and weekly rates update live:*
 
 ![Checklist demo](assets/demo.gif)
-
-![AI coach](assets/coach.png)
-
-*The AI coach greets you with your own stats and chats about your habits — bring your own API key (BYOK): Gemini, OpenAI, Claude, OpenRouter, or a local model via Ollama / LM Studio.*
 
 ## Data layout (in your vault)
 
@@ -29,18 +25,27 @@ Both files are human-readable and hand-editable. The plugin re-reads them on eve
 
 ## Features
 
-- **Checklist view** (ribbon icon, or command *Open checklist*): habits × 7-day grid, click a cell to toggle. Week navigation (‹ ›), per-habit streak (🔥) and weekly %.
+- **Checklist view** (ribbon icon, or command *Open checklist*): habits × 7-day grid, click a cell to toggle. Week navigation (‹ ›) with a *This week* button to come back, per-habit streak (🔥) and weekly %. The grid fits a narrow side pane without sideways scrolling.
+- **Today card**: shows how many of today's habits are done and asks about the next one; *Done* checks it off for today. It is worked out locally from your checks — no AI and no network.
+- **First run**: an empty checklist offers six starter habits you can add with one tap, or type your own.
 - **Add habits** inline; **archive** via the ⋯ menu next to the habit name.
 - **Progress graphs** (in the checklist view): per-habit 30-day history strip and trailing 8-week completion bars, rendered locally as SVG — no network involved.
 - **Share progress** (button in the checklist view, opt-in): posts aggregate statistics to `https://habitude.ai/api/share` and copies a `https://habitude.ai/s/<id>` link. Only runs when you click it.
 - **Weekly review** (command *Open weekly review* or the button in the view): per-habit completion bars, total checks.
 - **Command** *Toggle today for a habit*: quick toggle from the command palette.
 - **Status bar**: today's progress (`✓ 3/5 today`).
-- **AI coach** (ribbon icon, or command *Open AI coach*): chat with a coach that knows your habits — your streaks, weekly rates, and weekday patterns are shared with the model automatically as statistics. Bring your own key (BYOK): Gemini, OpenAI, Claude, OpenRouter, or a local model via Ollama / LM Studio.
-  - See it in action: [coach greeting](#screenshots) · [checklist demo](assets/demo.gif)
 - **Settings** (`Settings → Habitude checklist`): data folder, week start day (Mon/Sun), AI provider, API key, model, base URL, coach language.
-- **Explore Habitude**: a local overview separates the free plugin from planned Habitude Sync and Plus services. Compare monthly and annual USD totals before choosing to visit the website. Open it from a contextual suggestion, settings, or the command *Explore Habitude*.
-- **Optional app suggestions**: small, dismissible cards appear after adding a habit, after a weekly review with checks, or alongside the BYOK setup. *Hide app suggestions* saves a global preference; restore it with **Settings → Habitude checklist → Show Habitude suggestions**. Manual discovery remains available. Changing this preference preserves unfinished habit, API-key, and chat inputs.
+- **Explore Habitude**: a local overview lists what Habitude does beyond this plugin, each item marked *Available now* or *In preparation*, and separates the free plugin from planned Habitude Sync and Plus services. Compare monthly and annual USD totals before choosing to visit the website. Open it from a contextual suggestion, settings, or the command *Explore Habitude*.
+- **Optional app suggestions**: a small, dismissible card appears only at a moment that raises a question — when a run of three or more days has paused, in a week with three or more checks, after a weekly review with checks, or alongside the BYOK setup. A new or barely used checklist shows none. *Hide app suggestions* saves a global preference; restore it with **Settings → Habitude checklist → Show Habitude suggestions**. Manual discovery remains available. Changing this preference preserves unfinished habit, API-key, and chat inputs.
+
+## Optional: AI coach
+
+The checklist never needs it. If you want to talk your habits over, the coach (ribbon icon, or command *Open AI coach*) chats with a model that sees your streaks, weekly rates and weekday patterns as statistics.
+
+![AI coach](assets/coach.png)
+
+- **With a model on your computer, no key**: on desktop, *Find local models* lists the chat models in Ollama or LM Studio and starts with one click.
+- **With your own API key**: Gemini, OpenAI, Claude or OpenRouter. Your provider may charge for usage.
 
 ## Habitude app, web, and planned paid services
 
@@ -69,7 +74,8 @@ Run *Export habits for Habitude* or use **Settings → Habitude checklist → Mo
 - **Share progress: explicit opt-in.** Only aggregate statistics (habit titles, streaks, completion rates) are ever transmitted — never your note contents. The payload is `{version, pluginVersion, generatedAt, stats: {habits: [{title, streak, weekRate}]}}` posted to `https://habitude.ai/api/share`; nothing is sent unless you click the button.
 - **Clipboard: write-only, on your tap.** The only clipboard access is writing the share link to your clipboard right after you press *Share progress*; the plugin never reads your clipboard.
 - **AI coach: opt-in BYOK.** The coach only activates if you pick a provider and — for cloud providers — paste your own API key. Provider charges and access conditions apply. The key is stored in this vault's plugin settings, and requests go **directly to the provider you selected** — never to Habitude servers. Each message carries your habit titles and *statistics* (streaks, rates, patterns), plus the chat text you enter, never unrelated raw note contents. Local providers (Ollama, LM Studio) need no key at all.
-- **Habitude promotion: local and optional.** Static suggestions stay inside the plugin's own interface, can be hidden permanently, and make no network requests. Opening the overview or switching its billing period is entirely local. Only the explicit *Visit Habitude website* link opens `https://habitude.ai/` in your browser.
+- **Finding local models: only when you click.** *Find local models* on the coach setup screen runs only when you click it and asks only `localhost:11434` (Ollama) and `localhost:1234` (LM Studio) for their model lists. Nothing else is requested and nothing about your habits is sent.
+- **Habitude promotion: local and optional.** Suggestions stay inside the plugin's own interface, can be hidden permanently, and make no network requests. Which one to show is decided from your local check history; that decision is not recorded or sent anywhere. Opening the overview or switching its billing period is entirely local. Only the explicit *Visit Habitude website* link opens `https://habitude.ai/` in your browser.
 - **Fixed source information on website links.** Links include only `utm_source=obsidian`, `utm_medium=plugin`, `utm_campaign=companion`, a fixed UI location (`checklist`, `coach`, `review`, `settings`, or `command`), and `intent=explore`. No habit information, statistics, vault/device identifiers, credentials, or chat text are included. No analytics SDKs, impression counters, click events, beacons, prefetching, or background requests are added. The browser makes an ordinary page request; the website applies its own [privacy policy](https://habitude.ai/en/privacy). Website visits are not a count of plugin users or installs.
 
 **Credential storage limitation:** existing BYOK keys are stored in this vault's plugin `data.json`, not in an encrypted operating-system credential store. Vault configuration sync, backups, or other plugins may be able to access that file. Never include it in exports or shared archives. The new Habitude overview never reads or sends keys.

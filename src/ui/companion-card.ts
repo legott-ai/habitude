@@ -1,9 +1,11 @@
 import { t } from '../i18n';
-import type { CompanionEntryPoint } from '../companion';
+import type { CompanionEntryPoint, CompanionReason } from '../companion';
 
 export interface CompanionCardOptions {
 	entryPoint: CompanionEntryPoint;
-	reason: 'start' | 'review' | 'coach';
+	reason: CompanionReason;
+	/** Values for the reason's copy, e.g. the habit and length of a paused run. */
+	vars?: Record<string, string | number>;
 	onExplore: () => void;
 	onDismiss: () => void;
 }
@@ -12,8 +14,8 @@ export interface CompanionCardOptions {
 export function renderCompanionCard(host: HTMLElement, options: CompanionCardOptions): void {
 	const card = host.createDiv({ cls: 'habitude-companion-card' });
 	const copy = card.createDiv({ cls: 'habitude-companion-card-copy' });
-	copy.createEl('strong', { text: t(`companion.card.${options.reason}.title`) });
-	copy.createEl('p', { text: t(`companion.card.${options.reason}.body`) });
+	copy.createEl('strong', { text: t(`companion.card.${options.reason}.title`, options.vars) });
+	copy.createEl('p', { text: t(`companion.card.${options.reason}.body`, options.vars) });
 	const actions = card.createDiv({ cls: 'habitude-companion-card-actions' });
 	const explore = actions.createEl('button', {
 		text: t('companion.card.explore'),

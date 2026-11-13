@@ -1,10 +1,10 @@
 {
 	"author": "Habitude",
 	"authorUrl": "https://github.com/legott-ai",
-	"description": "7-day habit checklist with streaks and weekly review. Markdown-native: Habitude/Habits.md + Habitude/Log/. AI coach (BYOK): Gemini, OpenAI, Claude, OpenRouter, Ollama/LM Studio. Opt-in sharing.",
+	"description": "7-day habit checklist with a today card, streaks and weekly review. Markdown-native: Habitude/Habits.md + Habitude/Log/. Works without AI or an account. Optional: opt-in sharing and an AI coach.",
 	"id": "habitude-checklist",
 	"isDesktopOnly": false,
 	"minAppVersion": "1.13.0",
 	"name": "Habitude Checklist",
-	"version": "0.5.0"
+	"version": "0.6.0"
 }
